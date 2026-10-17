@@ -1,6 +1,6 @@
 // Cache the whole app on install so it opens instantly and works offline.
 // Page files are served from cache first and refreshed in the background.
-const CACHE = "tangent-v1";
+const CACHE = "tangent-v2";
 const ASSETS = [
   "./",
   "manifest.webmanifest",
@@ -24,7 +24,9 @@ self.addEventListener("activate", e => {
 
 self.addEventListener("fetch", e => {
   const req = e.request;
-  if (req.method !== "GET" || new URL(req.url).origin !== location.origin) return;
+  const u = new URL(req.url);
+  // Live data (quotes, scores) always goes to the network.
+  if (req.method !== "GET" || u.origin !== location.origin || u.pathname.startsWith("/api/")) return;
   // Cloudflare redirects /index.html to /, and a browser refuses a redirected response
   // for a page load, so every page load uses the "./" entry.
   const key = req.mode === "navigate" ? "./" : req;

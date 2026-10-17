@@ -7,7 +7,8 @@
   },
   "scripts": {
     "fetch": "node fetcher/run.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "scout": "node fetcher/scout.js"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",

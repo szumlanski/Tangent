@@ -53,6 +53,7 @@ export function parseFeed(xml) {
         author: txt(it.author?.name) || null,
         published: txt(it.published) || txt(it.updated) || null,
         videoId,
+        category: it.category?.["@term"] || null,
       };
     });
   }

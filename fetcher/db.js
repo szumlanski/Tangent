@@ -41,3 +41,20 @@ export const insertArticles = rows =>
   rows.length ? rest("tangent_articles?on_conflict=url", { method: "POST", body: rows, prefer: "resolution=ignore-duplicates,return=minimal" }) : null;
 
 export const updateSource = (id, patch) => rest(`tangent_sources?id=eq.${id}`, { method: "PATCH", body: patch, prefer: "return=minimal" });
+
+// Replace the trend snapshot: upsert this run's rows, then drop anything older.
+export async function saveTrends(rows) {
+  if (!rows.length) return;
+  const at = new Date().toISOString();
+  await rest("tangent_trends?on_conflict=source,channel,url", {
+    method: "POST", body: rows.map(r => ({ ...r, fetched_at: at })), prefer: "resolution=merge-duplicates,return=minimal",
+  });
+  if (!DRY) await rest(`tangent_trends?fetched_at=lt.${encodeURIComponent(at)}`, { method: "DELETE", prefer: "return=minimal" });
+}
+
+export const allSources = () => rest("tangent_sources?select=site_url,feed_url,topic");
+export const allSuggestionDomains = async () => DRY ? [] : (await rest("tangent_source_suggestions?select=domain")).map(r => r.domain);
+export const insertSuggestions = rows =>
+  rows.length ? rest("tangent_source_suggestions?on_conflict=domain", { method: "POST", body: rows, prefer: "resolution=ignore-duplicates,return=minimal" }) : null;
+export const recentBodies = () =>
+  DRY ? [] : rest("tangent_articles?select=url,body_html,tangent_sources(topic)&extracted=eq.true&order=fetched_at.desc&limit=400");

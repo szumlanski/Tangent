@@ -43,3 +43,14 @@ insert into public.tangent_sources (name, kind, topic, site_url, feed_url, strat
 on conflict do nothing;
 
 update public.tangent_sources set selectors = '{"list": "a[href^=\"/article/\"]"}'::jsonb where name = 'NBC2';
+
+-- Sports highlights (Sports tab)
+insert into public.tangent_sources (name, kind, topic, site_url, feed_url, strategies) values
+('NFL','youtube','sports','https://www.youtube.com/@NFL','https://www.youtube.com/feeds/videos.xml?channel_id=UCDVYQ4Zhbm3S2dlz7P1GBDg','{rss}'),
+('ESPN College Football','youtube','sports','https://www.youtube.com/@ESPNCFB','https://www.youtube.com/feeds/videos.xml?channel_id=UCzRWWsFjqHk1an4OnVPsl9g','{rss}'),
+('House of Highlights','youtube','sports','https://www.youtube.com/@HouseofHighlights','https://www.youtube.com/feeds/videos.xml?channel_id=UCqQo7ewe87aYAe7ub5UqXMw','{rss}'),
+('NBA','youtube','sports','https://www.youtube.com/@NBA','https://www.youtube.com/feeds/videos.xml?channel_id=UCWJ2lWNubArHWmf3FIHbfcQ','{rss}'),
+('MLB','youtube','sports','https://www.youtube.com/@MLB','https://www.youtube.com/feeds/videos.xml?channel_id=UCoLrcjPV5PbUrUyXq5mjc_A','{rss}'),
+('Florida Gators','youtube','sports','https://www.youtube.com/@FloridaGators','https://www.youtube.com/feeds/videos.xml?channel_id=UC97IlakvONh8RBUODRuk4mA','{rss}'),
+('MLS','youtube','sports','https://www.youtube.com/@MLS','https://www.youtube.com/feeds/videos.xml?channel_id=UCSZbXT5TLLW_i-5W8FZpFsg','{rss}')
+on conflict do nothing;

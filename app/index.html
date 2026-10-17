@@ -30,10 +30,12 @@
   --f-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --f-head: ui-serif, "New York", "Iowan Old Style", Georgia, "Times New Roman", serif;
   --top: calc(env(safe-area-inset-top, 0px) + 100px);
+  --tabbar: calc(54px + env(safe-area-inset-bottom, 0px));
+  --up: #1d8a43; --down: #d23c25;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #0c0d0f; --card: #1a1c20; --label: #f2f1ee; --label-2: #a3a6ad; --sep: rgba(255,255,255,0.1); --tint: #ff8a63; --bar: rgba(12,13,15,0.8); --shade: rgba(0,0,0,0.5); color-scheme: dark; }
+  :root { --bg: #0c0d0f; --card: #1a1c20; --label: #f2f1ee; --label-2: #a3a6ad; --sep: rgba(255,255,255,0.1); --tint: #ff8a63; --bar: rgba(12,13,15,0.8); --shade: rgba(0,0,0,0.5); --up: #3ccf6e; --down: #ff6b55; color-scheme: dark; }
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -80,8 +82,8 @@ a { color: inherit; }
 .card.small p { -webkit-line-clamp: 2; }
 
 /* Phone: flip stage */
-.stage { position: fixed; left: 0; right: 0; top: var(--top); bottom: 0; perspective: 2200px; touch-action: none; overflow: hidden; }
-.page { position: absolute; inset: 0; padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; background: var(--bg); }
+.stage { position: fixed; left: 0; right: 0; top: var(--top); bottom: var(--tabbar); perspective: 2200px; touch-action: none; overflow: hidden; }
+.page { position: absolute; inset: 0; padding: 12px; display: grid; gap: 12px; background: var(--bg); }
 .page.l1 { grid-template-rows: 1fr; }
 .page.l2 { grid-template-rows: 1fr 1fr; }
 .page.l3 { grid-template-rows: 1.25fr 1fr; grid-template-columns: 1fr 1fr; }
@@ -147,6 +149,93 @@ a { color: inherit; }
 .ok { background: #2fa84f; } .bad { background: #e0442b; } .off { background: #8e8e93; }
 .sec { font-size: 13px; color: var(--label-2); margin: 20px 16px 8px; }
 
+/* Sections: bottom tab bar on phones, inline in the masthead on desktop */
+.sections { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; height: var(--tabbar); padding-bottom: env(safe-area-inset-bottom, 0px); display: flex; background: var(--bar); backdrop-filter: saturate(1.6) blur(18px); -webkit-backdrop-filter: saturate(1.6) blur(18px); border-top: 0.5px solid var(--sep); }
+.sections button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; font-weight: 600; color: var(--label-2); }
+.sections svg { width: 26px; height: 26px; }
+.sections button[aria-selected="true"] { color: var(--tint); }
+body:not(.v-news) .tabs, body:not(.v-news) .kinds, body:not(.v-news) .stage, body:not(.v-news) .pager, body:not(.v-news) .grid, body:not(.v-news) .empty { display: none !important; }
+body:not(.v-news) { --top: calc(env(safe-area-inset-top, 0px) + 49px); }
+.view { max-width: 1280px; margin: 0 auto; padding: calc(var(--top) + 12px) 12px calc(var(--tabbar) + 24px); }
+.view h2 { font: 700 24px/1.2 var(--f-head); margin: 22px 4px 10px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.view h2 small { font: 400 13px var(--f-ui); color: var(--label-2); }
+.panel { background: var(--card); border-radius: 14px; box-shadow: 0 1px 2px var(--shade); overflow: hidden; }
+.muted { color: var(--label-2); font-size: 13px; }
+
+/* Stocks */
+.ranges { display: flex; background: var(--sep); border-radius: 9px; padding: 2px; margin: 4px 0 12px; position: sticky; top: calc(var(--top) + 4px); z-index: 5; }
+.ranges button { flex: 1; height: 32px; border-radius: 7px; font-size: 14px; font-weight: 600; color: var(--label-2); }
+.ranges button[aria-pressed="true"] { background: var(--card); color: var(--label); box-shadow: 0 1px 3px var(--shade); }
+.quotes { display: grid; gap: 12px; grid-template-columns: 1fr; }
+.quote { padding: 14px 16px 10px; }
+.quote .top { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; }
+.quote .nm { font-weight: 700; font-size: 17px; }
+.quote .px { font: 600 22px/1.1 var(--f-ui); font-variant-numeric: tabular-nums; text-align: right; }
+.quote .sub { font-size: 13px; color: var(--label-2); }
+.quote .chg { font-size: 15px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.up { color: var(--up); } .down { color: var(--down); }
+.chart { position: relative; margin-top: 10px; touch-action: pan-y; }
+.chart svg { width: 100%; height: 128px; display: block; overflow: visible; }
+.chart .tip { position: absolute; top: -2px; transform: translateX(-50%); background: var(--label); color: var(--bg); font-size: 12px; font-weight: 600; padding: 3px 7px; border-radius: 6px; white-space: nowrap; pointer-events: none; font-variant-numeric: tabular-nums; }
+.chart .axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--label-2); margin-top: 4px; font-variant-numeric: tabular-nums; }
+@media (min-width: 900px) { .quotes { grid-template-columns: repeat(2, 1fr); } .ranges { max-width: 520px; } }
+
+/* Sports */
+.games { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.game { padding: 12px 14px; display: grid; gap: 6px; text-decoration: none; }
+.game .row { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; min-height: 28px; }
+.game img { width: 28px; height: 28px; object-fit: contain; }
+.game .tm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.game .tm em { font-style: normal; font-size: 12px; color: var(--label-2); font-weight: 600; margin-right: 4px; }
+.game .sc { font: 700 20px var(--f-ui); font-variant-numeric: tabular-nums; }
+.game .lose { opacity: .55; }
+.game .st { font-size: 13px; color: var(--label-2); display: flex; justify-content: space-between; gap: 8px; }
+.game .st .live { color: var(--down); font-weight: 700; }
+.team { padding: 14px 16px; display: grid; gap: 10px; }
+.team .games { grid-template-columns: 1fr; }
+.teams { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+.team .hd { display: flex; align-items: center; gap: 12px; }
+.team .hd img { width: 44px; height: 44px; object-fit: contain; }
+.team .hd b { font-size: 19px; display: block; }
+.poll { columns: 2; column-gap: 24px; padding: 12px 16px; font-size: 15px; }
+.poll div { break-inside: avoid; padding: 4px 0; display: flex; gap: 8px; }
+.poll span { width: 22px; text-align: right; color: var(--label-2); font-variant-numeric: tabular-nums; }
+@media (min-width: 900px) { .poll { columns: 4; } }
+.heads { list-style: none; margin: 0; padding: 0; }
+.heads li { position: relative; }
+.heads li + li::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: 0.5px solid var(--sep); }
+.heads a { display: grid; grid-template-columns: 1fr 72px; gap: 12px; padding: 12px 16px; text-decoration: none; align-items: center; min-height: 64px; }
+.heads a b { font: 700 17px/1.25 var(--f-head); }
+.heads img { width: 72px; height: 48px; object-fit: cover; border-radius: 6px; background: #2a2d33; }
+.rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 280px); gap: 12px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
+.rail .card { height: 230px; scroll-snap-align: start; }
+details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; min-height: 44px; }
+
+/* Local trends */
+.card.trend { padding: 14px 16px; gap: 6px; overflow: auto; }
+.trend h3 { font: 700 22px/1.2 var(--f-head); margin: 0; -webkit-line-clamp: unset; display: block; }
+.trend ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.trend li a { display: flex; gap: 10px; align-items: baseline; padding: 7px 0; text-decoration: none; font-size: 16px; line-height: 1.3; }
+.trend li a span { flex: none; font-size: 12px; font-weight: 700; color: var(--tint); min-width: 44px; }
+.trend .grp { font-size: 12px; font-weight: 700; color: var(--label-2); margin-top: 8px; letter-spacing: .02em; }
+
+/* Suggestions */
+.sugg { padding: 12px 16px; display: grid; gap: 6px; }
+.sugg + .sugg { border-top: 0.5px solid var(--sep); }
+.sugg .acts { display: flex; gap: 8px; margin-top: 4px; }
+.sugg .acts button { height: 36px; padding: 0 16px; border-radius: 18px; font-size: 15px; font-weight: 600; background: var(--sep); }
+.sugg .acts button.add { background: var(--label); color: var(--bg); }
+.sugg ul { margin: 0; padding-left: 18px; font-size: 14px; color: var(--label-2); }
+
+@media (min-width: 900px) {
+  :root { --tabbar: 0px; }
+  .sections { top: calc(env(safe-area-inset-top, 0px) + 6px); bottom: auto; left: 50%; right: auto; transform: translateX(-50%); height: 36px; padding: 0; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; border: 0; gap: 4px; }
+  .sections button { flex-direction: row; gap: 6px; font-size: 15px; padding: 0 12px; height: 36px; border-radius: 18px; }
+  .sections svg { width: 20px; height: 20px; }
+  .sections button[aria-selected="true"] { background: var(--sep); }
+  .grid .card.trend { grid-column: span 2; grid-row: span 2; }
+}
+
 @media (prefers-reduced-motion: reduce) { .reader { transition: none; } .card { transition: none; } }
 </style>
 </head>
@@ -169,9 +258,17 @@ a { color: inherit; }
   <nav class="tabs" id="tabs" role="tablist"></nav>
 </header>
 
+<nav class="sections" id="sections" role="tablist" aria-label="Sections">
+        <button role="tab" data-view="news" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 5h13v14H6a2 2 0 0 1-2-2z"/><path d="M17 9h3v8a2 2 0 0 1-2 2"/><path d="M7 9h7M7 12h7M7 15h4"/></svg>News</button>
+        <button role="tab" data-view="stocks" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 3 8-8"/><path d="M15 7h5v5"/></svg>Stocks</button>
+        <button role="tab" data-view="sports" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="12" rx="9" ry="5.5" transform="rotate(-40 12 12)"/><path d="M9 15l6-6M10.5 10.5l1.5 1.5M12 9l1.5 1.5M9 12l1.5 1.5" stroke-linecap="round"/></svg>Sports</button>
+      </nav>
+
 <div class="stage" id="stage" aria-live="polite"></div>
 <div class="pager" id="pager" aria-hidden="true"></div>
 <main class="grid" id="grid"></main>
+<main class="view" id="stocksView" hidden></main>
+<main class="view" id="sportsView" hidden></main>
 <div class="empty" id="empty" hidden></div>
 
 <section class="reader" id="reader" aria-modal="true" role="dialog" aria-label="Article" hidden>
@@ -239,7 +336,7 @@ function diversify(items) {
 }
 
 function visible() {
-  let list = state.items.filter(i => (!state.topic || i.topic === state.topic) && (!state.kind || i.kind === state.kind));
+  let list = state.items.filter(i => i.topic !== "sports" && (!state.topic || i.topic === state.topic) && (!state.kind || i.kind === state.kind));
   // Same story from two outlets: keep the first (a stand-in until clustering lands).
   const seen = new Set();
   list = list.filter(i => {
@@ -284,13 +381,14 @@ function buildPages(list) {
   }
   if (pics.length) pages.push({ layout: "l" + pics.length, items: pics });
   if (text.length) pages.push({ layout: "list", items: text });
+  if (showTrends()) pages.splice(Math.min(1, pages.length), 0, { layout: "l1", trend: true, items: [] });
   return pages;
 }
 function pageEl(pg, extra = "") {
   const el = document.createElement("div");
   el.className = `page ${pg.layout} ${extra}`;
   const size = k => pg.layout === "l1" ? "big" : pg.layout === "list" || (pg.layout === "l3" && k > 0) ? "small" : "";
-  el.innerHTML = pg.items.map((it, k) => cardHTML(it, size(k))).join("");
+  el.innerHTML = pg.trend ? trendHTML() : pg.items.map((it, k) => cardHTML(it, size(k))).join("");
   return el;
 }
 
@@ -384,7 +482,7 @@ function go(dir) {
   const end = e => {
     if (y0 == null) return;
     if (dragging && flip) finishFlip(flip, flip.angle > 70);
-    else if (!dragging && e.type === "pointerup") {
+    else if (!dragging && e.type === "pointerup" && !e.target.closest("a")) {
       const card = e.target.closest(".card");
       if (card) openReader(+card.dataset.id);
     }
@@ -402,7 +500,7 @@ function go(dir) {
 /* ---------- desktop grid ---------- */
 function renderGrid(list) {
   const shapes = ["big", "", "", "tall", "", "wide", "", "", "", "wide", "tall", ""];
-  $("grid").innerHTML = list.map((it, i) => {
+  $("grid").innerHTML = (showTrends() ? trendHTML() : "") + list.map((it, i) => {
     let s = shapes[i % shapes.length];
     if (!it.image) s = "";
     return cardHTML(it, s);
@@ -508,7 +606,8 @@ async function openSources() {
   const r = $("reader"), body = $("rBody");
   sourcesOpen = true;
   $("rOrig").hidden = true;
-  body.innerHTML = `<h1>Sources</h1><p class="meta">Green fetched on the last run. Red failed; the reason is underneath.</p><div id="srcList">Loading…</div>`;
+  body.innerHTML = `<h1>Sources</h1><div id="suggList"></div><p class="meta">Green fetched on the last run. Red failed; the reason is underneath.</p><div id="srcList">Loading…</div>`;
+  renderSuggestions();
   r.hidden = false; r.scrollTop = 0;
   requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add("open")));
   document.body.style.overflow = "hidden";
@@ -539,25 +638,305 @@ function closeSources(fromHistory) {
 $("sourcesBtn").addEventListener("click", openSources);
 $("rClose").addEventListener("click", () => closeSources(false));
 
+/* ---------- local trends ---------- */
+let trends = store.get("trends", []);
+const showTrends = () => trends.length > 0 && (state.topic === "" || state.topic === "swfl") && !state.kind;
+function trendHTML() {
+  const g = trends.filter(t => t.source === "gtrends").slice(0, 6);
+  const r = trends.filter(t => t.source === "reddit").sort((a, b) => a.rank - b.rank).slice(0, 6);
+  const when = trends[0] ? ago(trends[0].fetched_at) + " ago" : "";
+  const li = (t, tag) => `<li><a href="${esc(t.url)}" target="_blank" rel="noopener noreferrer"><span>${esc(tag)}</span>${esc(t.title)}</a></li>`;
+  return `<div class="card trend noimg">
+    <div class="meta"><b>Trending locally</b><span>·</span><span>${when}</span></div>
+    ${g.length ? `<div class="grp">SEARCHED IN FLORIDA</div><ol>${g.map(t => li(t, t.traffic || "")).join("")}</ol>` : ""}
+    ${r.length ? `<div class="grp">TALKED ABOUT ON LOCAL REDDIT</div><ol>${r.map(t => li(t, t.channel.replace("r/", ""))).join("")}</ol>` : ""}
+  </div>`;
+}
+async function loadTrends() {
+  try {
+    trends = await sb("tangent_trends?select=source,channel,title,url,rank,traffic,fetched_at&order=source,rank&limit=60");
+    store.set("trends", trends);
+    if (view === "news") render();
+  } catch {}
+}
+
+/* ---------- views ---------- */
+let view = store.get("view", "news");
+function setView(v) {
+  view = v; store.set("view", v);
+  document.body.className = "v-" + v;
+  for (const b of document.querySelectorAll(".sections button")) b.setAttribute("aria-selected", String(b.dataset.view === v));
+  $("stocksView").hidden = v !== "stocks";
+  $("sportsView").hidden = v !== "sports";
+  scrollTo(0, 0);
+  if (v === "news") render();
+  if (v === "stocks") renderStocks();
+  if (v === "sports") renderSports();
+}
+$("sections").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (b) setView(b.dataset.view);
+});
+
+/* ---------- stocks ---------- */
+const TICKERS = [["SPX", "S&P 500"], ["COMP", "Nasdaq"], ["DJI", "Dow Jones"], ["VOO", "VOO"], ["SCHB", "SCHB"], ["KO", "Coca-Cola"]];
+const RANGE_LABEL = [["1d", "1D"], ["7d", "7D"], ["1m", "1M"], ["6m", "6M"], ["1y", "1Y"], ["5y", "5Y"]];
+let stockRange = store.get("range", "1d");
+const charts = {};
+const fmt = (v, d = 2) => v == null || isNaN(v) ? "–" : v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const pctTxt = (a, b) => { const p = (a - b) / b * 100; return `${p >= 0 ? "+" : ""}${fmt(a - b)} (${p >= 0 ? "+" : ""}${fmt(p)}%)`; };
+
+function renderStocks() {
+  const v = $("stocksView");
+  if (!v.dataset.built) {
+    v.dataset.built = 1;
+    v.innerHTML = `<h2>Markets <small id="mktNote">Delayed 15 min</small></h2>
+      <div class="ranges" role="group" aria-label="Range">${RANGE_LABEL.map(([k, l]) => `<button data-r="${k}" aria-pressed="${k === stockRange}">${l}</button>`).join("")}</div>
+      <div class="quotes">${TICKERS.map(([sym, nm]) => `<section class="panel quote" id="q-${sym}">
+        <div class="top"><span class="nm">${esc(nm)}</span><span class="px">–</span><span class="sub">${sym === "SPX" || sym === "COMP" || sym === "DJI" ? "Index" : sym === "KO" ? "KO · NYSE" : sym + " · ETF"}</span><span class="chg day">&nbsp;</span></div>
+        <div class="chart"><svg aria-hidden="true"></svg><div class="tip" hidden></div><div class="axis"><span class="a0"></span><span class="rc"></span><span class="a1"></span></div></div>
+      </section>`).join("")}</div>`;
+    v.querySelector(".ranges").addEventListener("click", e => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      stockRange = b.dataset.r; store.set("range", stockRange);
+      for (const x of v.querySelectorAll(".ranges button")) x.setAttribute("aria-pressed", String(x === b));
+      loadStocks();
+    });
+    for (const [sym] of TICKERS) wireScrub(sym);
+  }
+  loadStocks();
+}
+async function loadStocks() {
+  await Promise.all(TICKERS.map(async ([sym]) => {
+    const el = $("q-" + sym);
+    try {
+      const r = await fetch(`/api/chart?sym=${sym}&range=${stockRange}`);
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+      charts[sym] = d;
+      drawQuote(sym);
+    } catch {
+      el.querySelector(".rc").textContent = "Could not load";
+    }
+  }));
+}
+function drawQuote(sym) {
+  const d = charts[sym], el = $("q-" + sym);
+  const dec = d.last > 1000 ? 2 : 2;
+  el.querySelector(".px").textContent = fmt(d.last, dec);
+  const day = el.querySelector(".day");
+  day.textContent = pctTxt(d.last, d.prev) + " today";
+  day.className = "chg day " + (d.last >= d.prev ? "up" : "down");
+  const first = d.points[0][1];
+  const up = d.last >= first;
+  const svg = el.querySelector("svg");
+  const W = svg.clientWidth || 340, H = 128;
+  const ys = d.points.map(p => p[1]);
+  const lo = Math.min(...ys), hi = Math.max(...ys), span = hi - lo || 1;
+  const t0 = d.points[0][0], t1 = d.points.at(-1)[0], ts = t1 - t0 || 1;
+  // 1D spans the whole session even before the close, so the line grows across the day.
+  const x = stockRange === "1d" ? (i => i / Math.max(d.points.length - 1, 389) * W) : (i => (d.points[i][0] - t0) / ts * W);
+  const y = v => 6 + (1 - (v - lo) / span) * (H - 12);
+  const line = d.points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[1]).toFixed(1)}`).join("");
+  const col = up ? "var(--up)" : "var(--down)";
+  const prevY = stockRange === "1d" && d.prev >= lo && d.prev <= hi ? `<line x1="0" x2="${W}" y1="${y(d.prev)}" y2="${y(d.prev)}" stroke="var(--label-2)" stroke-dasharray="3 4" stroke-width="1" opacity=".6"/>` : "";
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = `<defs><linearGradient id="g-${sym}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${up ? "#1d8a43" : "#d23c25"}" stop-opacity=".22"/><stop offset="1" stop-color="${up ? "#1d8a43" : "#d23c25"}" stop-opacity="0"/></linearGradient></defs>
+    ${prevY}<path d="${line}L${x(d.points.length - 1).toFixed(1)},${H}L0,${H}Z" fill="url(#g-${sym})"/><path d="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle class="dot" r="4" fill="${col}" cx="0" cy="0" opacity="0"/>`;
+  svg._x = x; svg._y = y; svg._w = W;
+  const fd = t => new Date(t).toLocaleDateString("en-US", stockRange === "5y" ? { month: "short", year: "numeric", timeZone: "UTC" } : { month: "short", day: "numeric", timeZone: "UTC" });
+  el.querySelector(".a0").textContent = stockRange === "1d" ? "9:30" : fd(t0);
+  el.querySelector(".a1").textContent = stockRange === "1d" ? "4:00" : fd(t1);
+  const rc = el.querySelector(".rc");
+  rc.textContent = stockRange === "1d" ? `${d.source}` : `${RANGE_LABEL.find(r => r[0] === stockRange)[1]} ${pctTxt(d.last, first).replace(/^.*\(/, "").replace(")", "")}`;
+  rc.className = "rc " + (stockRange === "1d" ? "" : up ? "up" : "down");
+}
+// Touch or hover the chart to read a price.
+function wireScrub(sym) {
+  const el = $("q-" + sym), box = el.querySelector(".chart"), tip = el.querySelector(".tip");
+  const move = e => {
+    const d = charts[sym], svg = box.querySelector("svg");
+    if (!d || !svg._x) return;
+    const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) / r.width * svg._w;
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < d.points.length; i++) { const dd = Math.abs(svg._x(i) - px); if (dd < bd) { bd = dd; best = i; } }
+    const [t, v] = d.points[best];
+    const dot = svg.querySelector(".dot");
+    dot.setAttribute("cx", svg._x(best)); dot.setAttribute("cy", svg._y(v)); dot.setAttribute("opacity", "1");
+    tip.hidden = false;
+    tip.style.left = Math.min(Math.max(svg._x(best) / svg._w * r.width, 40), r.width - 40) + "px";
+    const when = new Date(t).toLocaleString("en-US", stockRange === "1d" || stockRange === "7d" ? { hour: "numeric", minute: "2-digit", month: stockRange === "7d" ? "short" : undefined, day: stockRange === "7d" ? "numeric" : undefined, timeZone: d.source === "Yahoo" ? "America/New_York" : "UTC" } : { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+    tip.textContent = `${fmt(v)} · ${when}`;
+  };
+  const leave = () => { tip.hidden = true; const dot = box.querySelector(".dot"); if (dot) dot.setAttribute("opacity", "0"); };
+  box.addEventListener("pointermove", move);
+  box.addEventListener("pointerdown", move);
+  box.addEventListener("pointerleave", leave);
+  box.addEventListener("pointerup", e => { if (e.pointerType !== "mouse") leave(); });
+}
+
+/* ---------- sports ---------- */
+
+const MY_TEAMS = [["57", "Florida"], ["127", "Michigan State"]];
+const OTHER_LEAGUES = [
+  ["basketball/nba", "NBA"], ["hockey/nhl", "NHL"], ["baseball/mlb", "MLB"], ["basketball/wnba", "WNBA"],
+  ["soccer/usa.1", "MLS"], ["basketball/mens-college-basketball", "College basketball"],
+];
+// Through our edge proxy: ESPN's own CORS headers come and go.
+const espn = path => {
+  const [p, q] = path.split("?");
+  return fetch(`/api/espn?p=${encodeURIComponent(p)}${q ? "&" + q : ""}`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+};
+const val = v => v == null ? "" : typeof v === "object" ? (v.displayValue ?? v.value ?? "") : v;
+
+function gameHTML(ev, opts = {}) {
+  const c = ev.competitions?.[0] || ev;
+  const st = (c.status || ev.status)?.type || {};
+  const teams = [...(c.competitors || [])].sort((a, b) => (a.homeAway === "away" ? -1 : 1));
+  const done = st.state === "post", live = st.state === "in";
+  const scores = teams.map(t => +val(t.score) || 0);
+  const row = (t, i) => {
+    const rank = t.curatedRank?.current && t.curatedRank.current < 26 ? `<em>${t.curatedRank.current}</em>` : "";
+    const logo = t.team?.logo || t.team?.logos?.[0]?.href || "";
+    const lose = done && scores[i] < scores[1 - i];
+    return `<div class="row ${lose ? "lose" : ""}">${logo ? `<img src="${esc(logo)}" alt="" loading="lazy">` : "<span></span>"}<span class="tm">${rank}${esc(t.team?.shortDisplayName || t.team?.displayName || "")}</span><span class="sc">${st.state === "pre" ? "" : esc(val(t.score))}</span></div>`;
+  };
+  const when = st.state === "pre"
+    ? new Date(ev.date).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })
+    : st.shortDetail || st.detail || "";
+  const tv = c.broadcasts?.[0]?.names?.[0] || c.broadcasts?.[0]?.media?.shortName || "";
+  const link = ev.links?.find(l => l.rel?.includes("summary"))?.href || ev.links?.[0]?.href || "";
+  return `<a class="panel game" href="${esc(link)}" target="_blank" rel="noopener noreferrer">
+    ${teams.map(row).join("")}
+    <div class="st"><span class="${live ? "live" : ""}">${live ? "LIVE · " : ""}${esc(when)}</span><span>${esc(opts.note || tv)}</span></div>
+  </a>`;
+}
+
+async function teamCard([id, label]) {
+  const [t, sched] = await Promise.all([espn(`football/college-football/teams/${id}`), espn(`football/college-football/teams/${id}/schedule`).catch(() => null)]);
+  const team = t.team;
+  const evs = sched?.events || [];
+  const last = evs.filter(e => e.competitions?.[0]?.status?.type?.state === "post").at(-1);
+  const now = evs.find(e => e.competitions?.[0]?.status?.type?.state === "in");
+  const next = team.nextEvent?.[0];
+  const show = [now || null, !now && last ? last : null, next && next.id !== now?.id && next.id !== last?.id ? next : null].filter(Boolean);
+  return `<section class="panel team">
+    <div class="hd"><img src="${esc(team.logos?.[0]?.href || "")}" alt=""><div><b>${team.rank ? `#${team.rank} ` : ""}${esc(team.displayName)}</b><span class="muted">${esc(team.record?.items?.[0]?.summary || "")}${team.standingSummary ? " · " + esc(team.standingSummary) : ""}</span></div></div>
+    <div class="games">${show.map(e => gameHTML(e)).join("") || `<p class="muted">No games scheduled.</p>`}</div>
+  </section>`;
+}
+
+function headsHTML(arts) {
+  return `<ul class="panel heads">${arts.map(a => `<li><a href="${esc(a.links?.web?.href || a.links?.mobile?.href || "#")}" target="_blank" rel="noopener noreferrer"><div><b>${esc(a.headline)}</b><div class="muted">${esc(a.league || "")}${a.published ? " · " + ago(a.published) + " ago" : ""}</div></div>${a.images?.[0]?.url ? `<img src="${esc(a.images[0].url)}" alt="" loading="lazy">` : "<span></span>"}</a></li>`).join("")}</ul>`;
+}
+
+async function renderSports() {
+  const v = $("sportsView");
+  if (!v.dataset.built) { v.dataset.built = 1; v.innerHTML = `<p class="muted" style="padding:24px 4px">Loading scores…</p>`; }
+  const settle = p => p.then(x => x, () => null);
+  const [teams, cfb, poll, nfl, others, cfbNews, nflNews] = await Promise.all([
+    settle(Promise.all(MY_TEAMS.map(teamCard))),
+    settle(espn("football/college-football/scoreboard")),
+    settle(espn("football/college-football/rankings")),
+    settle(espn("football/nfl/scoreboard")),
+    Promise.all(OTHER_LEAGUES.map(([p, n]) => settle(espn(p + "/scoreboard")).then(d => ({ p, n, d })))),
+    settle(espn("football/college-football/news?limit=6")),
+    settle(espn("football/nfl/news?limit=6")),
+  ]);
+  // "In season" means regular season or playoffs with games on the board.
+  const inSeason = others.filter(o => o.d && (o.d.events || []).length && [2, 3].includes(o.d.leagues?.[0]?.season?.type?.type ?? o.d.season?.type));
+  const otherNews = await Promise.all(inSeason.slice(0, 4).map(o => settle(espn(o.p + "/news?limit=3")).then(d => (d?.articles || []).map(a => ({ ...a, league: o.n })))));
+  const news = [
+    ...(cfbNews?.articles || []).map(a => ({ ...a, league: "College football" })),
+    ...(nflNews?.articles || []).map(a => ({ ...a, league: "NFL" })),
+    ...otherNews.flat(),
+  ].filter(a => a.headline);
+  const highlights = state.items.filter(i => i.topic === "sports" && i.kind === "youtube").slice(0, 16);
+  const ap = poll?.rankings?.find(r => /AP/.test(r.name)) || poll?.rankings?.[0];
+
+  v.innerHTML = `
+    <h2>Your teams</h2>
+    <div class="teams">${(teams || []).join("") || `<p class="muted">Could not load team info.</p>`}</div>
+    ${highlights.length ? `<h2>Highlights</h2><div class="rail">${highlights.map(i => cardHTML(i, "")).join("")}</div>` : ""}
+    <h2>College football <small>${esc(cfb?.week?.number ? "Week " + cfb.week.number + " · Top 25" : "Top 25")}</small></h2>
+    <div class="games">${(cfb?.events || []).map(e => gameHTML(e)).join("") || `<p class="muted">No ranked games this week.</p>`}</div>
+    ${ap ? `<details class="panel" style="margin-top:12px"><summary>${esc(ap.name)}</summary><div class="poll">${ap.ranks.map(r => `<div><span>${r.current}</span>${esc(r.team.location)} <small class="muted">${esc(r.recordSummary || "")}</small></div>`).join("")}</div></details>` : ""}
+    <h2>NFL <small>${nfl?.week?.number ? "Week " + nfl.week.number : ""}</small></h2>
+    <div class="games">${(nfl?.events || []).map(e => gameHTML(e)).join("") || `<p class="muted">No games this week.</p>`}</div>
+    ${inSeason.map(o => `<h2>${esc(o.n)} <small>${esc(o.d.leagues?.[0]?.season?.type?.name || "")}</small></h2><div class="games">${o.d.events.slice(0, 12).map(e => gameHTML(e)).join("")}</div>`).join("")}
+    <h2>Headlines</h2>
+    ${news.length ? headsHTML(news.sort((a, b) => Date.parse(b.published) - Date.parse(a.published)).slice(0, 18)) : `<p class="muted">No headlines right now.</p>`}
+  `;
+}
+$("sportsView").addEventListener("click", e => {
+  const card = e.target.closest(".card");
+  if (card) openReader(+card.dataset.id);
+});
+
+/* ---------- source suggestions (owner only) ---------- */
+// The owner key arrives once via #key=... and stays on this device.
+(function takeKey() {
+  const m = location.hash.match(/key=([a-f0-9]{32})/);
+  if (m) { store.set("ownerKey", m[1]); history.replaceState(null, "", location.pathname); }
+})();
+async function rpc(fn, args) {
+  const r = await fetch(SB + "rpc/" + fn, { method: "POST", headers: { apikey: SB_KEY, authorization: "Bearer " + SB_KEY, "content-type": "application/json" }, body: JSON.stringify(args) });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function renderSuggestions() {
+  const box = $("suggList");
+  if (!box) return;
+  let rows = [];
+  try { rows = await sb("tangent_source_suggestions?select=*&order=created_at.desc&limit=30"); } catch { return; }
+  if (!rows.length) { box.innerHTML = ""; return; }
+  const key = store.get("ownerKey", "");
+  box.innerHTML = `<div class="sec">Suggested by the weekly scout</div><div class="panel">${rows.map(r => `<div class="sugg" data-id="${r.id}">
+      <div><b>${esc(r.name)}</b> <span class="muted">· ${esc(TOPICS.find(t => t[0] === r.topic)?.[1] || r.topic)} · ${esc(r.domain)}</span></div>
+      <div class="muted">${esc(r.reason || "")} · ${Math.round(r.per_week || 0)} posts this week · ${Math.round((r.free_ratio || 0) * 100)}% free</div>
+      <ul>${(r.samples || []).map(x => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a></li>`).join("")}</ul>
+      <div class="acts">${key ? `<button class="add" data-act="add">Add source</button><button data-act="dismiss">Dismiss</button>` : `<span class="muted">Open your setup link on this device to approve sources.</span>`}</div>
+    </div>`).join("")}</div>`;
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest(".sugg button[data-act]");
+  if (!b) return;
+  const row = b.closest(".sugg");
+  b.disabled = true;
+  try {
+    await rpc("tangent_review_suggestion", { p_id: +row.dataset.id, p_action: b.dataset.act, p_key: store.get("ownerKey", "") });
+    row.innerHTML = `<span class="muted">${b.dataset.act === "add" ? "Added. It will be fetched on the next run." : "Dismissed."}</span>`;
+  } catch (err) {
+    b.disabled = false;
+    row.querySelector(".acts").insertAdjacentHTML("beforeend", `<span class="muted">${/bad key/.test(err.message) ? "This device's key is wrong. Open your setup link again." : "Could not save. Try again."}</span>`);
+  }
+});
+
 /* ---------- load ---------- */
 async function load() {
   try {
     const rows = await sb("tangent_feed?select=*&order=published_at.desc&limit=400");
     state.items = rows;
     store.set("feed", rows);
-    render();
+    if (view === "news") render();
+    if (view === "sports" && $("sportsView").dataset.built) renderSports();
   } catch (e) {
     if (!state.items.length) { $("empty").hidden = false; $("empty").textContent = "Could not reach the news server. Pull to retry when you are back online."; }
   }
 }
 
-if (location.hash) history.replaceState(null, "", location.pathname);
+if (location.hash && !/key=/.test(location.hash)) history.replaceState(null, "", location.pathname);
 renderTabs();
+setView(view);
 for (const x of document.querySelectorAll(".kinds button")) x.setAttribute("aria-pressed", String(x.dataset.kind === state.kind));
 render();
 load();
-setInterval(load, 10 * 60e3);
-document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") load(); });
+loadTrends();
+setInterval(() => { load(); loadTrends(); }, 10 * 60e3);
+// Quotes and scores refresh every minute while their tab is open.
+setInterval(() => { if (document.visibilityState !== "visible") return; if (view === "stocks") loadStocks(); if (view === "sports") renderSports(); }, 60e3);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { load(); loadTrends(); } });
 addEventListener("resize", () => { if (!flip) renderStage(); });
 
 if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));

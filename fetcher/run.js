@@ -7,6 +7,7 @@ import { scrape } from "./strategies/scrape.js";
 import { extract, plain } from "./extract.js";
 import { isBlockedDomain } from "./paywall.js";
 import * as db from "./db.js";
+import { collectTrends } from "./trends.js";
 
 const STRATEGIES = { rss, gnews, sitemap, scrape };
 // News goes stale fast; videos and blogs post less often.
@@ -133,11 +134,16 @@ async function processSourceInner(source) {
   return { source: source.name, strategy: found.strategy, found: found.items.length, added: unique.length, paywalled };
 }
 
+// Trends move slowly; refresh them on the first run of each hour.
+const trends = new Date().getUTCMinutes() < 15 || process.env.TRENDS === "1"
+  ? collectTrends().then(db.saveTrends).catch(e => console.warn("trends:", e.message))
+  : Promise.resolve();
 const all = await db.sources();
 const only = process.argv[2];
 const list = only ? all.filter(s => s.name.toLowerCase().includes(only.toLowerCase())) : all;
 console.log(`Fetching ${list.length} sources`);
 const results = await pool(list, 6, processSource);
+await trends;
 for (const r of results) console.log(r.error instanceof Error ? `ERR ${r.error.message}` : JSON.stringify(r));
 if (process.env.DRY === "1") {
   const rows = db.dryRows;
