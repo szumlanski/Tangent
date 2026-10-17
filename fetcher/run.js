@@ -13,6 +13,10 @@ const STRATEGIES = { rss, gnews, sitemap, scrape };
 // News goes stale fast; videos and blogs post less often.
 const MAX_AGE = { news: 3 * 864e5, blog: 14 * 864e5, youtube: 14 * 864e5, podcast: 14 * 864e5 };
 const MAX_NEW_PER_SOURCE = 15;
+const ROW_DEFAULTS = {
+  origin_url: null, excerpt: null, image: null, author: null, body_html: null, word_count: null,
+  extracted: false, paywalled: false, paywall_reason: null, video_id: null,
+};
 
 // Try each strategy in order; the first that returns items wins.
 async function discover(source) {
@@ -111,8 +115,9 @@ async function processSourceInner(source) {
     }
   }
 
-  // A redirect can land two items on the same URL; keep the first.
-  const unique = [...new Map(rows.map(r => [r.url, r])).values()];
+  // A redirect can land two items on the same URL; keep the first. A bulk insert
+  // needs identical keys on every row, so fill in the optional columns.
+  const unique = [...new Map(rows.map(r => [r.url, { ...ROW_DEFAULTS, ...r }])).values()];
   await db.insertArticles(unique);
 
   const items_seen = source.items_seen + unique.length;

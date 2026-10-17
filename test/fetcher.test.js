@@ -66,3 +66,10 @@ test("plain() strips tags, including entity-encoded ones", async () => {
   const { plain } = await import("../fetcher/extract.js");
   assert.equal(plain("&lt;p&gt;Hello &amp; <b>world</b>&lt;/p&gt;"), "Hello & world");
 });
+
+test("rows sent in one insert share the same keys", async () => {
+  const src = await import("node:fs").then(fs => fs.readFileSync(new URL("../fetcher/run.js", import.meta.url), "utf8"));
+  const defaults = src.match(/const ROW_DEFAULTS = (\{[\s\S]*?\});/)[1];
+  const keys = Object.keys(Function(`return ${defaults}`)());
+  for (const k of ["paywalled", "paywall_reason", "video_id", "body_html", "extracted", "word_count", "origin_url"]) assert.ok(keys.includes(k), k);
+});

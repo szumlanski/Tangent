@@ -12,7 +12,7 @@ insert into public.tangent_sources (name, kind, topic, site_url, feed_url, strat
 -- Tech / AI
 ('Ars Technica',        'news',    'tech',    'https://arstechnica.com',             'https://feeds.arstechnica.com/arstechnica/index', '{rss,gnews}'),
 ('The Verge',           'news',    'tech',    'https://www.theverge.com',            'https://www.theverge.com/rss/index.xml',          '{rss,gnews}'),
-('Hacker News',         'news',    'tech',    'https://news.ycombinator.com',        'https://news.ycombinator.com/rss',                '{rss}'),
+('Hacker News',         'news',    'tech',    'https://news.ycombinator.com',        'https://hnrss.org/frontpage?points=100',          '{rss}'),
 ('Anthropic',           'blog',    'tech',    'https://www.anthropic.com',           null,                                              '{gnews,sitemap}'),
 ('Simon Willison',      'blog',    'tech',    'https://simonwillison.net',           'https://simonwillison.net/atom/everything/',      '{rss}'),
 ('Technology Connections','youtube','tech',   'https://www.youtube.com/@TechnologyConnections','https://www.youtube.com/feeds/videos.xml?channel_id=UCy0tKL1T7wFoYcxCe0xjN6Q', '{rss}'),
