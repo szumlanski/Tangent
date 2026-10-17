@@ -24,7 +24,8 @@ const Summary = z.object({
 });
 
 const SUMMARY_SYSTEM = `You write the summary shown on a news card and at the top of the reader.
-Use only facts stated in the articles. No opinion, no speculation, no filler like "this article discusses".
+Use only facts stated in the articles. Do not add background from your own knowledge: give people the titles and roles the articles give them, and assume the articles are more current than anything you know.
+No opinion, no speculation, no filler like "this article discusses".
 When outlets disagree on a fact, say so briefly. Write plain American English. Use commas or periods, never long dashes.`;
 
 // Plain text from Readability HTML, capped in words.
