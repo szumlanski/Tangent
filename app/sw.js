@@ -1,6 +1,6 @@
 // Cache the whole app on install so it opens instantly and works offline.
 // Page files are served from cache first and refreshed in the background.
-const CACHE = "tangent-v3";
+const CACHE = "tangent-v4";
 const ASSETS = [
   "./",
   "manifest.webmanifest",

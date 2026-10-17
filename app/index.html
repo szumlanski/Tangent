@@ -118,9 +118,11 @@ a { color: inherit; }
 .empty { position: fixed; inset: var(--top) 0 0; display: grid; place-items: center; text-align: center; color: var(--label-2); padding: 24px; }
 
 /* Reader */
-.reader { position: fixed; inset: 0; z-index: 40; background: var(--bg); overflow-y: auto; -webkit-overflow-scrolling: touch; transform: translateY(100%); transition: transform .32s cubic-bezier(.2,.8,.2,1); }
+/* The panel slides; an inner box scrolls. A transformed scroller paints out of sync on mobile. */
+.reader { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; flex-direction: column; overflow: hidden; transform: translateY(100%); transition: transform .32s cubic-bezier(.2,.8,.2,1); }
+.rscroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; }
 .reader.open { transform: none; }
-.rbar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: env(safe-area-inset-top, 0px) 4px 0; height: calc(52px + env(safe-area-inset-top, 0px)); background: var(--bar); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border-bottom: 0.5px solid var(--sep); }
+.rbar { flex: none; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: env(safe-area-inset-top, 0px) 4px 0; height: calc(52px + env(safe-area-inset-top, 0px)); background: var(--bar); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border-bottom: 0.5px solid var(--sep); }
 .rbar .pill { height: 36px; padding: 0 14px; margin-right: 8px; border-radius: 18px; background: var(--label); color: var(--bg); font-size: 15px; font-weight: 600; display: inline-flex; align-items: center; text-decoration: none; }
 .rbody { max-width: 680px; margin: 0 auto; padding: 20px 20px calc(60px + env(safe-area-inset-bottom, 0px)); }
 .rbody .hero { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 12px; background: #2a2d33; display: block; }
@@ -279,7 +281,7 @@ details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; m
     </button>
     <a class="pill" id="rOrig" target="_blank" rel="noopener noreferrer">Original</a>
   </div>
-  <article class="rbody" id="rBody"></article>
+  <div class="rscroll" id="rScroll"><article class="rbody" id="rBody"></article></div>
 </section>
 
 <script>
@@ -550,7 +552,8 @@ function clean(html, base) {
   for (const el of doc.body.querySelectorAll("*")) {
     for (const a of [...el.attributes]) {
       const n = a.name.toLowerCase(), v = a.value.trim().toLowerCase();
-      if (n.startsWith("on") || n === "style" || n === "srcset" && el.tagName !== "IMG" || (n === "href" || n === "src") && v.startsWith("javascript:")) el.removeAttribute(a.name);
+      // Site class and id names can collide with ours (a WINK article has class="page").
+      if (n.startsWith("on") || n === "style" || n === "class" || n === "id" || n === "srcset" && el.tagName !== "IMG" || (n === "href" || n === "src") && v.startsWith("javascript:")) el.removeAttribute(a.name);
     }
     if (el.tagName === "A") { try { el.href = new URL(el.getAttribute("href") || "", base).href; } catch {} el.target = "_blank"; el.rel = "noopener noreferrer"; }
     if (el.tagName === "IMG") { try { el.src = new URL(el.getAttribute("src") || el.dataset.src || "", base).href; } catch {} el.loading = "lazy"; el.removeAttribute("width"); el.removeAttribute("height"); }
@@ -568,7 +571,7 @@ async function openReader(id) {
     ? `<iframe class="video" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(it.video_id)}?rel=0&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen title="${esc(it.title)}"></iframe>`
     : it.image ? `<img class="hero" src="${esc(it.image)}" alt="">` : "";
   body.innerHTML = `${top}<h1>${esc(it.title)}</h1>${meta}<div id="rText">${it.excerpt ? `<p class="teaser">${esc(it.excerpt)}</p>` : ""}</div>`;
-  r.hidden = false; r.scrollTop = 0;
+  r.hidden = false; $("rScroll").scrollTop = 0;
   requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add("open")));
   document.body.style.overflow = "hidden";
   if (location.hash !== "#read") history.pushState({ read: id }, "", "#read");
@@ -609,7 +612,7 @@ async function openSources() {
   $("rOrig").hidden = true;
   body.innerHTML = `<h1>Sources</h1><div id="suggList"></div><p class="meta">Green fetched on the last run. Red failed; the reason is underneath.</p><div id="srcList">Loading…</div>`;
   renderSuggestions();
-  r.hidden = false; r.scrollTop = 0;
+  r.hidden = false; $("rScroll").scrollTop = 0;
   requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add("open")));
   document.body.style.overflow = "hidden";
   history.pushState({ sources: 1 }, "", "#sources");
