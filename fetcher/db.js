@@ -61,9 +61,14 @@ export const recentBodies = () =>
 
 // ---- stories ----
 export const unclustered = (since, limit) =>
-  rest(`tangent_articles?select=id,title,excerpt,kind,tangent_sources(name,topic)&cluster_id=is.null&paywalled=is.false&fetched_at=gte.${encodeURIComponent(since)}&order=fetched_at.asc&limit=${limit}`);
-export const recentClusters = since =>
-  rest(`tangent_clusters?select=id,headline,topic,article_count&updated_at=gte.${encodeURIComponent(since)}&order=updated_at.desc&limit=800`);
+  rest(`tangent_articles?select=id,title,excerpt,kind,source_id,tangent_sources(name,topic)&cluster_id=is.null&paywalled=is.false&fetched_at=gte.${encodeURIComponent(since)}&order=fetched_at.asc&limit=${limit}`);
+export const recentClustered = since =>
+  rest(`tangent_articles?select=id,title,excerpt,source_id,cluster_id&cluster_id=not.is.null&paywalled=is.false&fetched_at=gte.${encodeURIComponent(since)}&limit=3000`);
+export async function clusterCounts(ids) {
+  if (DRY) return new Map();
+  const rows = await rest(`tangent_clusters?select=id,article_count&id=in.(${ids.join(",")})`);
+  return new Map(rows.map(r => [r.id, r.article_count]));
+}
 let fakeId = 1e9;
 export async function createClusters(rows) {
   if (!rows.length) return [];

@@ -4,7 +4,7 @@
 - Always merge finished work to `main` and push to deploy. Do not ask Jason first.
 - The web app is `app/index.html` (UI, CSS, JS). Keep it one self-contained file with no outside scripts or fonts so it stays fast and works offline.
 - The fetcher is Node in `fetcher/`, run by `.github/workflows/fetch.yml` every 15 min. Run `npm test` and `DRY=1 npm run fetch` before pushing fetcher changes. Behind the cloud proxy, set `NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt`.
-- Story grouping and summaries: `fetcher/stories.js`, model `claude-haiku-5-5` (cheap, runs every 15 min). Keep model calls in the exported `model` object so tests can stand in for them.
+- Story grouping is free and local (`fetcher/match.js`, word matching across different outlets). Only multi-outlet stories get a Claude summary (`fetcher/stories.js`, `claude-haiku-5-5`). Jason cares about API cost: never send Claude data on every run that a local step can handle, and estimate monthly cost before adding any model call.
 - `functions/api/chart.js` and `functions/api/espn.js` are Pages Functions (free plan: keep CPU light, cache at the edge). The service worker must never cache `/api/`.
 - Approving scout suggestions needs the owner key, opened once per device as `https://tangent.szumlanski.com/#key=...`. Only its SHA-256 is in `tangent_config`.
 - Database: Supabase project EG4 Monitor (`kyplwgcvbfzyfhiyspsr`). It is a live customer database for another app. Only ever touch objects prefixed `tangent_`. Add schema changes as new files in `supabase/migrations/`.

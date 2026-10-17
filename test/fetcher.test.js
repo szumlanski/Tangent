@@ -74,23 +74,30 @@ test("rows sent in one insert share the same keys", async () => {
   for (const k of ["paywalled", "paywall_reason", "video_id", "body_html", "extracted", "word_count", "origin_url"]) assert.ok(keys.includes(k), k);
 });
 
-test("story plan: joins, new groups, and bad labels", async () => {
-  const { plan } = await import("../fetcher/stories.js");
-  const articles = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }];
-  const stories = [{ id: 10, article_count: 2 }];
-  const p = plan(articles, stories, [
-    { article: "a1", story: "s10" },   // joins existing
-    { article: "a2", story: "n1" },    // new story with a3
-    { article: "a3", story: "n1" },
-    { article: "a4", story: "s999" },  // unknown story id
-    { article: "a77", story: "n2" },   // unknown article, ignored
-    { article: "a2", story: "s10" },   // duplicate assignment, first wins
-  ]);                                   // a5 missing
-  assert.deepEqual(p.get("s10"), [1]);
-  assert.deepEqual(p.get("n1"), [2, 3]);
-  assert.deepEqual(p.get("solo4"), [4]);
-  assert.deepEqual(p.get("solo5"), [5]);
-  assert.equal(p.size, 4);
+test("story matching merges outlets on one event, not one outlet's posts", async () => {
+  const { match } = await import("../fetcher/match.js");
+  const filler = Array.from({ length: 40 }, (_, i) => ({ id: 100 + i, source_id: 9, title: `Unrelated story number ${i} about topic ${i * 7} things`, teaser: "" }));
+  const fresh = [
+    { id: 1, source_id: 1, title: "Pope Leo returns to the Vatican 4 days after lung cancer surgery", teaser: "" },
+    { id: 2, source_id: 2, title: "Pope Leo returns to Vatican four days after lung cancer surgery", teaser: "" },
+    { id: 3, source_id: 3, title: "Solar imports from India, Indonesia, Laos injured US manufacturers", teaser: "" },
+    { id: 4, source_id: 4, title: "Brewers sweep Dodgers in NLCS full game highlights", teaser: "" },
+    { id: 5, source_id: 4, title: "Brewers sweep Dodgers NLCS instant reaction highlights", teaser: "" },
+  ];
+  const { joins, groups } = match([], [...filler, ...fresh]);
+  assert.equal(joins.size, 0);
+  const g = groups.find(x => x.includes(1));
+  assert.deepEqual(g, [1, 2]);
+  assert.ok(groups.some(x => x.length === 1 && x[0] === 3));
+  assert.ok(!groups.some(x => x.includes(4) && x.includes(5)), "same outlet never merges");
+});
+
+test("story matching joins an existing story", async () => {
+  const { match } = await import("../fetcher/match.js");
+  const filler = Array.from({ length: 40 }, (_, i) => ({ id: 100 + i, source_id: 9, cluster_id: 900 + i, title: `Unrelated story number ${i} about topic ${i * 7} things`, teaser: "" }));
+  const existing = [...filler, { id: 1, source_id: 1, cluster_id: 77, title: "Barre wins flood recovery funds for North End housing", teaser: "" }];
+  const { joins } = match(existing, [{ id: 2, source_id: 2, title: "Barre wins flood recovery funds for long-awaited North End housing", teaser: "" }]);
+  assert.equal(joins.get(2), 77);
 });
 
 test("summary text cleanup removes long dashes and tags", async () => {
