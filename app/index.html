@@ -138,6 +138,13 @@ a { color: inherit; }
 .prose blockquote { margin: 16px 0; padding-left: 16px; border-left: 3px solid var(--accent); color: var(--label-2); }
 .prose pre { overflow-x: auto; font-size: 14px; background: var(--card); padding: 12px; border-radius: 8px; }
 .prose table { display: block; overflow-x: auto; }
+.sum, .also { background: var(--card); border-radius: 12px; padding: 12px 16px; margin: 0 0 18px; }
+.sum-h { font-size: 13px; font-weight: 700; color: var(--tint); margin-bottom: 6px; }
+.sum ul { margin: 0; padding-left: 20px; font-size: 16px; line-height: 1.45; }
+.sum li + li { margin-top: 6px; }
+.also button { display: grid; gap: 2px; width: 100%; text-align: left; padding: 10px 0; min-height: 44px; border-top: 0.5px solid var(--sep); font-size: 15px; }
+.also button:first-of-type { border-top: 0; }
+.also button span { color: var(--label-2); line-height: 1.35; }
 .teaser { font-size: 19px; line-height: 1.55; color: var(--label-2); }
 .notice { margin-top: 24px; padding: 14px 16px; background: var(--card); border-radius: 12px; font-size: 15px; color: var(--label-2); }
 
@@ -339,29 +346,37 @@ function diversify(items) {
 }
 
 function visible() {
-  let list = state.items.filter(i => i.topic !== "sports" && (!state.topic || i.topic === state.topic) && (!state.kind || i.kind === state.kind));
-  // Same story from two outlets: keep the first (a stand-in until clustering lands).
-  const seen = new Set();
-  list = list.filter(i => {
-    const key = i.cluster_id ? "c" + i.cluster_id : i.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 60);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+  const list = state.items.filter(i => i.topic !== "sports" && (!state.topic || i.topic === state.topic) && (!state.kind || i.kind === state.kind));
+  // One card per story. Articles not grouped yet fall back to a headline match.
+  const groups = new Map();
+  for (const i of list) {
+    const key = i.cluster_id ? "c" + i.cluster_id : "t" + i.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 60);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(i);
+  }
+  const cards = [...groups.values()].map(members => {
+    // Lead with the outlet that has a picture and full text; the story sorts by its newest article.
+    const lead = members.find(m => m.image && m.extracted) || members.find(m => m.image) || members[0];
+    return { ...lead, members, newest: members.reduce((t, m) => m.published_at > t ? m.published_at : t, lead.published_at) };
   });
-  return diversify(list);
+  cards.sort((a, b) => b.newest.localeCompare(a.newest));
+  return diversify(cards);
 }
 
 /* ---------- cards ---------- */
 function cardHTML(it, size) {
   const hasImg = !!it.image && size !== "small";
   const kind = KIND_LABEL[it.kind] ? `<span class="k">${KIND_LABEL[it.kind]}</span><span>·</span>` : "";
+  const many = (it.story_size || 1) > 1 ? `<span>·</span><span class="k">${it.story_size} outlets</span>` : "";
+  const title = (it.story_size || 1) > 1 && it.story_headline ? it.story_headline : it.title;
+  const blurb = it.summary_short || it.excerpt;
   const play = it.kind === "youtube" ? `<span class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>${dur(it.duration_s) || "Play"}</span>` : "";
   return `<button class="card ${size || ""} ${hasImg ? "" : "noimg"}" data-id="${it.id}">
     ${hasImg ? `<div class="img" style="background-image:url('${esc(it.image).replace(/'/g, "%27")}')">${play}</div>` : ""}
     <div class="txt">
-      <div class="meta">${kind}<b>${esc(it.source_name)}</b><span>·</span><span>${ago(it.published_at)}</span></div>
-      <h3>${esc(it.title)}</h3>
-      ${it.excerpt && (!hasImg || size === "big") ? `<p>${esc(it.excerpt)}</p>` : ""}
+      <div class="meta">${kind}<b>${esc(it.source_name)}</b><span>·</span><span>${ago(it.newest || it.published_at)}</span>${many}</div>
+      <h3>${esc(title)}</h3>
+      ${blurb && (!hasImg || size === "big" || it.summary_short) ? `<p>${esc(blurb)}</p>` : ""}
     </div>
   </button>`;
 }
@@ -561,7 +576,7 @@ function clean(html, base) {
   return doc.body.innerHTML;
 }
 
-async function openReader(id) {
+async function openReader(id, swap = false) {
   const it = state.items.find(x => x.id === id);
   if (!it) return;
   const r = $("reader"), body = $("rBody");
@@ -570,11 +585,16 @@ async function openReader(id) {
   const top = it.kind === "youtube" && it.video_id
     ? `<iframe class="video" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(it.video_id)}?rel=0&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen title="${esc(it.title)}"></iframe>`
     : it.image ? `<img class="hero" src="${esc(it.image)}" alt="">` : "";
-  body.innerHTML = `${top}<h1>${esc(it.title)}</h1>${meta}<div id="rText">${it.excerpt ? `<p class="teaser">${esc(it.excerpt)}</p>` : ""}</div>`;
+  const others = state.items.filter(x => it.cluster_id && x.cluster_id === it.cluster_id && x.id !== it.id);
+  const sum = Array.isArray(it.bullets) && it.bullets.length
+    ? `<section class="sum"><div class="sum-h">Summary${it.story_size > 1 ? ` · from ${it.story_size} outlets` : ""}</div><ul>${it.bullets.map(b => `<li>${esc(b)}</li>`).join("")}</ul></section>` : "";
+  const also = others.length
+    ? `<section class="also"><div class="sum-h">Also covered by</div>${others.map(o => `<button data-open="${o.id}"><b>${esc(o.source_name)}</b><span>${esc(o.title)}</span></button>`).join("")}</section>` : "";
+  body.innerHTML = `${top}<h1>${esc(it.title)}</h1>${meta}${sum}${also}<div id="rText">${!sum && it.excerpt ? `<p class="teaser">${esc(it.excerpt)}</p>` : ""}</div>`;
   r.hidden = false; $("rScroll").scrollTop = 0;
   requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add("open")));
   document.body.style.overflow = "hidden";
-  if (location.hash !== "#read") history.pushState({ read: id }, "", "#read");
+  if (location.hash !== "#read" && !swap) history.pushState({ read: id }, "", "#read");
 
   if (it.kind === "youtube") return;
   try {
@@ -601,6 +621,11 @@ function closeReader(fromHistory) {
   if (!fromHistory && location.hash === "#read") history.back();
 }
 $("rClose").addEventListener("click", () => closeReader(false));
+// Jump to another outlet's version of the same story.
+$("rBody").addEventListener("click", e => {
+  const b = e.target.closest("[data-open]");
+  if (b) openReader(+b.dataset.open, true);
+});
 addEventListener("popstate", () => { closeReader(true); if (location.hash !== "#sources") closeSources(true); });
 addEventListener("keydown", e => { if (e.key === "Escape") { closeReader(false); closeSources(false); } });
 

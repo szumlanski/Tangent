@@ -73,3 +73,28 @@ test("rows sent in one insert share the same keys", async () => {
   const keys = Object.keys(Function(`return ${defaults}`)());
   for (const k of ["paywalled", "paywall_reason", "video_id", "body_html", "extracted", "word_count", "origin_url"]) assert.ok(keys.includes(k), k);
 });
+
+test("story plan: joins, new groups, and bad labels", async () => {
+  const { plan } = await import("../fetcher/stories.js");
+  const articles = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }];
+  const stories = [{ id: 10, article_count: 2 }];
+  const p = plan(articles, stories, [
+    { article: "a1", story: "s10" },   // joins existing
+    { article: "a2", story: "n1" },    // new story with a3
+    { article: "a3", story: "n1" },
+    { article: "a4", story: "s999" },  // unknown story id
+    { article: "a77", story: "n2" },   // unknown article, ignored
+    { article: "a2", story: "s10" },   // duplicate assignment, first wins
+  ]);                                   // a5 missing
+  assert.deepEqual(p.get("s10"), [1]);
+  assert.deepEqual(p.get("n1"), [2, 3]);
+  assert.deepEqual(p.get("solo4"), [4]);
+  assert.deepEqual(p.get("solo5"), [5]);
+  assert.equal(p.size, 4);
+});
+
+test("summary text cleanup removes long dashes and tags", async () => {
+  const { clean, text } = await import("../fetcher/stories.js");
+  assert.equal(clean("Lee Health " + String.fromCharCode(0x2014) + " and United"), "Lee Health, and United");
+  assert.equal(text("<p>One &amp; two</p><script>x()</script><p>three four</p>", 3), "One & two ...");
+});

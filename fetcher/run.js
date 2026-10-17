@@ -8,6 +8,7 @@ import { extract, plain } from "./extract.js";
 import { isBlockedDomain } from "./paywall.js";
 import * as db from "./db.js";
 import { collectTrends } from "./trends.js";
+import { stories } from "./stories.js";
 
 const STRATEGIES = { rss, gnews, sitemap, scrape };
 // News goes stale fast; videos and blogs post less often.
@@ -152,6 +153,9 @@ console.log(`Fetching ${list.length} sources`);
 const results = await pool(list, 6, processSource);
 await trends;
 for (const r of results) console.log(r.error instanceof Error ? `ERR ${r.error.message}` : JSON.stringify(r));
+// Group new articles into stories and summarize them (needs ANTHROPIC_API_KEY).
+await stories().catch(e => console.warn("stories:", e.message));
+
 if (process.env.DRY === "1") {
   const rows = db.dryRows;
   console.log(`\nDRY: ${rows.length} rows, ${rows.filter(r => r.extracted).length} full text, ${rows.filter(r => r.paywalled).length} paywalled`);

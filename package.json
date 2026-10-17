@@ -11,9 +11,11 @@
     "scout": "node fetcher/scout.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "@mozilla/readability": "^0.6.0",
     "fast-xml-parser": "^5.11.2",
     "linkedom": "^0.18.13",
-    "undici": "^8.12.2"
+    "undici": "^8.12.2",
+    "zod": "^4.6.7"
   }
 }

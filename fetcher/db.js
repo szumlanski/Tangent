@@ -58,3 +58,23 @@ export const insertSuggestions = rows =>
   rows.length ? rest("tangent_source_suggestions?on_conflict=domain", { method: "POST", body: rows, prefer: "resolution=ignore-duplicates,return=minimal" }) : null;
 export const recentBodies = () =>
   DRY ? [] : rest("tangent_articles?select=url,body_html,tangent_sources(topic)&extracted=eq.true&order=fetched_at.desc&limit=400");
+
+// ---- stories ----
+export const unclustered = (since, limit) =>
+  rest(`tangent_articles?select=id,title,excerpt,kind,tangent_sources(name,topic)&cluster_id=is.null&paywalled=is.false&fetched_at=gte.${encodeURIComponent(since)}&order=fetched_at.asc&limit=${limit}`);
+export const recentClusters = since =>
+  rest(`tangent_clusters?select=id,headline,topic,article_count&updated_at=gte.${encodeURIComponent(since)}&order=updated_at.desc&limit=800`);
+let fakeId = 1e9;
+export async function createClusters(rows) {
+  if (!rows.length) return [];
+  if (DRY) { dryClusters.push(...rows); return rows.map(() => ({ id: fakeId++ })); }
+  return rest("tangent_clusters?select=id", { method: "POST", body: rows, prefer: "return=representation" });
+}
+export const dryClusters = [];
+export const setCluster = (ids, clusterId) =>
+  rest(`tangent_articles?id=in.(${ids.join(",")})`, { method: "PATCH", body: { cluster_id: clusterId }, prefer: "return=minimal" });
+export const updateCluster = (id, patch) =>
+  rest(`tangent_clusters?id=eq.${id}`, { method: "PATCH", body: patch, prefer: "return=minimal" });
+export const clustersToSummarize = lim => DRY ? [] : rest("rpc/tangent_clusters_to_summarize", { method: "POST", body: { lim } });
+export const clusterMembers = id =>
+  rest(`tangent_articles?select=title,excerpt,body_html,extracted,kind,tangent_sources(name)&cluster_id=eq.${id}&paywalled=is.false&order=extracted.desc,published_at.desc&limit=6`);
