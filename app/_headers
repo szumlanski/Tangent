@@ -1,0 +1,5 @@
+/sw.js
+  Cache-Control: no-cache
+
+/*.png
+  Cache-Control: public, max-age=604800

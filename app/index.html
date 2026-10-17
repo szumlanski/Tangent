@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tangent</title>
+<meta name="description" content="Your news, no paywalls, one card per story">
+<meta name="theme-color" content="#121417">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tangent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="referrer" content="no-referrer">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="app-icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="app-icon-180.png">
+<style>
+:root {
+  --bg: #f4f1ec;
+  --card: #ffffff;
+  --label: #16181b;
+  --label-2: #5c5f66;       /* 6.3:1 on white */
+  --sep: rgba(22, 24, 27, 0.12);
+  --tint: #c8401a;          /* 5.1:1 on white */
+  --accent: #ff6a3d;
+  --head: #121417;
+  --bar: rgba(244, 241, 236, 0.82);
+  --shade: rgba(0, 0, 0, 0.18);
+  --f-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --f-head: ui-serif, "New York", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --top: calc(env(safe-area-inset-top, 0px) + 100px);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0c0d0f; --card: #1a1c20; --label: #f2f1ee; --label-2: #a3a6ad; --sep: rgba(255,255,255,0.1); --tint: #ff8a63; --bar: rgba(12,13,15,0.8); --shade: rgba(0,0,0,0.5); color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--label); font: 400 17px/1.4 var(--f-ui); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+a { color: inherit; }
+:focus-visible { outline: 3px solid var(--tint); outline-offset: 2px; border-radius: 8px; }
+
+/* Top bar: masthead + topic tabs + kind filter */
+.bar { position: fixed; inset: 0 0 auto 0; z-index: 20; background: var(--bar); backdrop-filter: saturate(1.6) blur(18px); -webkit-backdrop-filter: saturate(1.6) blur(18px); border-bottom: 0.5px solid var(--sep); padding-top: env(safe-area-inset-top, 0px); }
+.mast { display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 8px 0 16px; max-width: 1280px; margin: 0 auto; }
+.logo { font: 700 26px/1 var(--f-head); letter-spacing: -0.02em; display: flex; align-items: baseline; gap: 2px; }
+.logo i { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); display: inline-block; transform: translateY(-1px); }
+.mast-r { display: flex; align-items: center; }
+.icon-btn { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 22px; color: var(--label-2); }
+.icon-btn svg { width: 22px; height: 22px; }
+.tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 0 12px 8px; max-width: 1280px; margin: 0 auto; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: none; height: 36px; padding: 0 14px; border-radius: 18px; font-size: 15px; font-weight: 600; color: var(--label-2); white-space: nowrap; }
+.tab[aria-selected="true"] { background: var(--label); color: var(--bg); }
+.kinds { display: inline-flex; background: var(--sep); border-radius: 9px; padding: 2px; margin-right: 4px; }
+.kinds button { height: 30px; padding: 0 10px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--label-2); }
+.kinds button[aria-pressed="true"] { background: var(--card); color: var(--label); box-shadow: 0 1px 3px var(--shade); }
+
+/* Cards */
+.card { position: relative; display: flex; flex-direction: column; background: var(--card); border-radius: 14px; overflow: hidden; text-align: left; width: 100%; height: 100%; min-height: 0; box-shadow: 0 1px 2px var(--shade); }
+.card .img { position: relative; flex: 1 1 55%; min-height: 0; background: #2a2d33 center/cover no-repeat; }
+.card .img .play { position: absolute; left: 12px; bottom: 12px; display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,.72); color: #fff; font-size: 13px; font-weight: 600; padding: 6px 10px 6px 8px; border-radius: 16px; }
+.card .img .play svg { width: 14px; height: 14px; }
+.card .txt { flex: 0 1 auto; padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: hidden; }
+.meta { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--label-2); white-space: nowrap; overflow: hidden; }
+.meta b { font-weight: 600; color: var(--label); overflow: hidden; text-overflow: ellipsis; }
+.meta .k { color: var(--tint); font-weight: 600; }
+.card h3 { margin: 0; font: 700 20px/1.2 var(--f-head); letter-spacing: -0.01em; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+.card p { margin: 0; font-size: 15px; line-height: 1.4; color: var(--label-2); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.card.big h3 { font-size: 28px; -webkit-line-clamp: 4; }
+.card.noimg { background: var(--card); }
+.card.noimg .txt { flex: 1; justify-content: flex-start; }
+.card.noimg h3 { -webkit-line-clamp: 6; }
+.card.noimg::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--accent); }
+.card.small .img { display: none; }
+.card.small h3 { font-size: 18px; -webkit-line-clamp: 3; }
+.card.small p { -webkit-line-clamp: 2; }
+
+/* Phone: flip stage */
+.stage { position: fixed; left: 0; right: 0; top: var(--top); bottom: 0; perspective: 2200px; touch-action: none; overflow: hidden; }
+.page { position: absolute; inset: 0; padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; background: var(--bg); }
+.page.l1 { grid-template-rows: 1fr; }
+.page.l2 { grid-template-rows: 1fr 1fr; }
+.page.l3 { grid-template-rows: 1.25fr 1fr; grid-template-columns: 1fr 1fr; }
+.page.l3 > :first-child { grid-column: 1 / -1; }
+.page.list { grid-template-rows: repeat(4, 1fr); }
+.page.list .card h3 { -webkit-line-clamp: 3; }
+.half-top { clip-path: inset(0 0 50% 0); }
+.half-bot { clip-path: inset(50% 0 0 0); }
+.flap { position: absolute; inset: 0; transform-style: preserve-3d; transform-origin: 50% 50%; will-change: transform; }
+.flap > .page { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.flap > .back { transform: rotateX(180deg); }
+.dim { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+.pager { position: fixed; right: 4px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 5px; z-index: 5; pointer-events: none; }
+.pager i { width: 4px; height: 4px; border-radius: 2px; background: var(--label-2); opacity: .35; }
+.pager i.on { opacity: 1; height: 14px; background: var(--accent); }
+
+/* Desktop: magazine grid */
+.grid { display: none; max-width: 1280px; margin: 0 auto; padding: calc(var(--top) + 20px) 24px 48px; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 210px; gap: 20px; }
+.grid .card.big { grid-column: span 2; grid-row: span 2; }
+.grid .card.wide { grid-column: span 2; }
+.grid .card.tall { grid-row: span 2; }
+.grid .card:not(.big):not(.tall):not(.noimg) h3 { -webkit-line-clamp: 2; font-size: 18px; }
+.grid .card.noimg h3 { -webkit-line-clamp: 4; }
+@media (min-width: 900px) {
+  .stage, .pager { display: none; }
+  .grid { display: grid; }
+  .card { transition: transform .15s ease, box-shadow .15s ease; }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px var(--shade); }
+}
+@media (min-width: 900px) and (max-width: 1100px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+
+.empty { position: fixed; inset: var(--top) 0 0; display: grid; place-items: center; text-align: center; color: var(--label-2); padding: 24px; }
+
+/* Reader */
+.reader { position: fixed; inset: 0; z-index: 40; background: var(--bg); overflow-y: auto; -webkit-overflow-scrolling: touch; transform: translateY(100%); transition: transform .32s cubic-bezier(.2,.8,.2,1); }
+.reader.open { transform: none; }
+.rbar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: env(safe-area-inset-top, 0px) 4px 0; height: calc(52px + env(safe-area-inset-top, 0px)); background: var(--bar); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border-bottom: 0.5px solid var(--sep); }
+.rbar .pill { height: 36px; padding: 0 14px; margin-right: 8px; border-radius: 18px; background: var(--label); color: var(--bg); font-size: 15px; font-weight: 600; display: inline-flex; align-items: center; text-decoration: none; }
+.rbody { max-width: 680px; margin: 0 auto; padding: 20px 20px calc(60px + env(safe-area-inset-bottom, 0px)); }
+.rbody .hero { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 12px; background: #2a2d33; display: block; }
+.rbody .video { width: 100%; aspect-ratio: 16/9; border: 0; border-radius: 12px; display: block; background: #000; }
+.rbody h1 { font: 700 30px/1.15 var(--f-head); letter-spacing: -0.015em; margin: 18px 0 10px; }
+.rbody .meta { white-space: normal; margin-bottom: 18px; }
+.prose { font: 400 19px/1.6 var(--f-head); }
+.prose img, .prose video, .prose figure { max-width: 100%; height: auto; border-radius: 8px; }
+.prose figure { margin: 20px 0; }
+.prose figcaption { font: 13px/1.4 var(--f-ui); color: var(--label-2); margin-top: 6px; }
+.prose a { color: var(--tint); }
+.prose h2, .prose h3 { font-family: var(--f-head); line-height: 1.25; }
+.prose blockquote { margin: 16px 0; padding-left: 16px; border-left: 3px solid var(--accent); color: var(--label-2); }
+.prose pre { overflow-x: auto; font-size: 14px; background: var(--card); padding: 12px; border-radius: 8px; }
+.prose table { display: block; overflow-x: auto; }
+.teaser { font-size: 19px; line-height: 1.55; color: var(--label-2); }
+.notice { margin-top: 24px; padding: 14px 16px; background: var(--card); border-radius: 12px; font-size: 15px; color: var(--label-2); }
+
+/* Sources sheet */
+.list { background: var(--card); border-radius: 12px; overflow: hidden; margin: 0 0 20px; padding: 0; list-style: none; }
+.list li { padding: 11px 16px; position: relative; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; }
+.list li + li::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: 0.5px solid var(--sep); }
+.list .n { font-weight: 600; }
+.list .s { grid-column: 1; font-size: 13px; color: var(--label-2); overflow-wrap: anywhere; }
+.list .dot { grid-row: 1 / span 2; grid-column: 2; width: 10px; height: 10px; border-radius: 5px; }
+.ok { background: #2fa84f; } .bad { background: #e0442b; } .off { background: #8e8e93; }
+.sec { font-size: 13px; color: var(--label-2); margin: 20px 16px 8px; }
+
+@media (prefers-reduced-motion: reduce) { .reader { transition: none; } .card { transition: none; } }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="mast">
+    <div class="logo" aria-label="Tangent">Tangent<i></i></div>
+    <div class="mast-r">
+      <div class="kinds" role="group" aria-label="Show">
+        <button data-kind="" aria-pressed="true">All</button>
+        <button data-kind="news" aria-pressed="false">News</button>
+        <button data-kind="youtube" aria-pressed="false">Video</button>
+        <button data-kind="blog" aria-pressed="false">Blogs</button>
+      </div>
+      <button class="icon-btn" id="sourcesBtn" aria-label="Sources">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.5" fill="currentColor"/></svg>
+      </button>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+</header>
+
+<div class="stage" id="stage" aria-live="polite"></div>
+<div class="pager" id="pager" aria-hidden="true"></div>
+<main class="grid" id="grid"></main>
+<div class="empty" id="empty" hidden></div>
+
+<section class="reader" id="reader" aria-modal="true" role="dialog" aria-label="Article" hidden>
+  <div class="rbar">
+    <button class="icon-btn" id="rClose" aria-label="Close">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <a class="pill" id="rOrig" target="_blank" rel="noopener noreferrer">Original</a>
+  </div>
+  <article class="rbody" id="rBody"></article>
+</section>
+
+<script>
+const SB = "https://kyplwgcvbfzyfhiyspsr.supabase.co/rest/v1/";
+const SB_KEY = "sb_publishable_LqD81rhJPP9kVN_Rdw22eQ_jhZ3Hc_r"; // public by design; RLS guards the data
+const TOPICS = [
+  ["", "For you"], ["solar", "Solar"], ["tech", "Tech & AI"], ["world", "World"],
+  ["swfl", "SW Florida"], ["travel", "Travel"], ["vermont", "Vermont"],
+];
+const KIND_LABEL = { youtube: "Video", blog: "Blog", podcast: "Podcast" };
+
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, f) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : f; } catch { return f; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const isDesktop = () => matchMedia("(min-width: 900px)").matches;
+
+function ago(iso) {
+  const m = Math.max(1, Math.round((Date.now() - Date.parse(iso)) / 6e4));
+  if (m < 60) return m + "m";
+  const h = Math.round(m / 60);
+  if (h < 24) return h + "h";
+  return Math.round(h / 24) + "d";
+}
+const dur = s => s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` : "";
+
+async function sb(path) {
+  const r = await fetch(SB + path, { headers: { apikey: SB_KEY, authorization: "Bearer " + SB_KEY } });
+  if (!r.ok) throw new Error(r.status + " " + (await r.text()));
+  return r.json();
+}
+
+/* ---------- state ---------- */
+const state = {
+  topic: store.get("topic", ""),
+  kind: store.get("kind", ""),
+  items: store.get("feed", []),
+  page: 0,
+};
+
+// Spread sources out so one busy outlet cannot fill a page.
+function diversify(items) {
+  const pool = items.slice();
+  const out = [];
+  while (pool.length) {
+    const recent = out.slice(-4).map(i => i.source_id);
+    let k = pool.findIndex(i => !recent.includes(i.source_id));
+    if (k < 0) k = 0;
+    out.push(pool.splice(k, 1)[0]);
+  }
+  return out;
+}
+
+function visible() {
+  let list = state.items.filter(i => (!state.topic || i.topic === state.topic) && (!state.kind || i.kind === state.kind));
+  // Same story from two outlets: keep the first (a stand-in until clustering lands).
+  const seen = new Set();
+  list = list.filter(i => {
+    const key = i.cluster_id ? "c" + i.cluster_id : i.title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().slice(0, 60);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return diversify(list);
+}
+
+/* ---------- cards ---------- */
+function cardHTML(it, size) {
+  const hasImg = !!it.image && size !== "small";
+  const kind = KIND_LABEL[it.kind] ? `<span class="k">${KIND_LABEL[it.kind]}</span><span>·</span>` : "";
+  const play = it.kind === "youtube" ? `<span class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>${dur(it.duration_s) || "Play"}</span>` : "";
+  return `<button class="card ${size || ""} ${hasImg ? "" : "noimg"}" data-id="${it.id}">
+    ${hasImg ? `<div class="img" style="background-image:url('${esc(it.image).replace(/'/g, "%27")}')">${play}</div>` : ""}
+    <div class="txt">
+      <div class="meta">${kind}<b>${esc(it.source_name)}</b><span>·</span><span>${ago(it.published_at)}</span></div>
+      <h3>${esc(it.title)}</h3>
+      ${it.excerpt && (!hasImg || size === "big") ? `<p>${esc(it.excerpt)}</p>` : ""}
+    </div>
+  </button>`;
+}
+
+/* ---------- phone pages ---------- */
+// Picture stories cycle hero, pair, trio. Stories with no picture are gathered
+// four to a page as headlines, so no page is a big empty card.
+function buildPages(list) {
+  const pages = [], text = [], pics = [], pattern = [1, 2, 3, 2];
+  let p = 0;
+  for (const it of list) {
+    if (!it.image) {
+      text.push(it);
+      if (text.length === 4) pages.push({ layout: "list", items: text.splice(0) });
+      continue;
+    }
+    pics.push(it);
+    const want = pattern[p % pattern.length];
+    if (pics.length === want) { pages.push({ layout: "l" + want, items: pics.splice(0) }); p++; }
+  }
+  if (pics.length) pages.push({ layout: "l" + pics.length, items: pics });
+  if (text.length) pages.push({ layout: "list", items: text });
+  return pages;
+}
+function pageEl(pg, extra = "") {
+  const el = document.createElement("div");
+  el.className = `page ${pg.layout} ${extra}`;
+  const size = k => pg.layout === "l1" ? "big" : pg.layout === "list" || (pg.layout === "l3" && k > 0) ? "small" : "";
+  el.innerHTML = pg.items.map((it, k) => cardHTML(it, size(k))).join("");
+  return el;
+}
+
+let pages = [];
+function renderStage() {
+  const stage = $("stage");
+  stage.replaceChildren();
+  if (!pages.length) return;
+  state.page = Math.min(state.page, pages.length - 1);
+  stage.append(pageEl(pages[state.page]));
+  renderPager();
+}
+function renderPager() {
+  const n = pages.length, cur = state.page;
+  const from = Math.max(0, Math.min(cur - 4, n - 9)), to = Math.min(n, from + 9);
+  $("pager").innerHTML = Array.from({ length: to - from }, (_, k) => `<i class="${from + k === cur ? "on" : ""}"></i>`).join("");
+}
+
+/* Flipboard fold: the page folds at its horizontal midline.
+   Forward: the bottom half of the current page swings up, its back shows the next page's top half. */
+let flip = null;
+function startFlip(dir) {
+  const to = state.page + dir;
+  if (to < 0 || to >= pages.length) return null;
+  const stage = $("stage");
+  const cur = pages[state.page], nxt = pages[to];
+  stage.replaceChildren();
+  const base = pageEl(nxt);                                         // what is revealed underneath
+  const still = pageEl(cur, dir > 0 ? "half-top" : "half-bot");     // half of current that does not move
+  const flap = document.createElement("div");
+  flap.className = "flap";
+  const front = pageEl(cur, dir > 0 ? "half-bot" : "half-top");
+  // The back face is pre-rotated 180deg, so after the fold the half it shows lands upright:
+  // forward reveals the next page's top half, backward its bottom half.
+  const back = pageEl(nxt, "back");
+  back.style.clipPath = dir > 0 ? "inset(0 0 50% 0)" : "inset(50% 0 0 0)";
+  flap.append(front, back);
+  const dimUnder = document.createElement("div");
+  dimUnder.className = "dim";
+  stage.append(base, dimUnder, still, flap);
+  return { dir, to, flap, dimUnder, angle: 0 };
+}
+function setAngle(f, a) {
+  f.angle = a;
+  f.flap.style.transform = `rotateX(${f.dir > 0 ? a : -a}deg)`;
+  f.dimUnder.style.opacity = String(0.35 * (1 - Math.min(1, a / 90)));
+}
+function finishFlip(f, commit) {
+  const target = commit ? 180 : 0;
+  const done = () => {
+    if (commit) { state.page = f.to; store.set("page:" + state.topic + state.kind, state.page); }
+    renderStage();
+    flip = null;
+  };
+  if (reduceMotion) return done();
+  const from = f.angle, t0 = performance.now(), ms = 260 * Math.abs(target - from) / 180 + 60;
+  const step = now => {
+    const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+    setAngle(f, from + (target - from) * e);
+    k < 1 ? requestAnimationFrame(step) : done();
+  };
+  requestAnimationFrame(step);
+}
+function go(dir) {
+  if (flip) return;
+  const f = startFlip(dir);
+  if (!f) return;
+  flip = f;
+  finishFlip(f, true);
+}
+
+// Drag to flip. A short move is a tap and opens the card.
+(() => {
+  const stage = $("stage");
+  let y0 = null, x0 = 0, dragging = false, h = 1;
+  stage.addEventListener("pointerdown", e => {
+    if (flip) return;
+    y0 = e.clientY; x0 = e.clientX; dragging = false; h = stage.clientHeight;
+  });
+  stage.addEventListener("pointermove", e => {
+    if (y0 == null) return;
+    const dy = e.clientY - y0;
+    if (!dragging && Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(e.clientX - x0)) {
+      const f = startFlip(dy < 0 ? 1 : -1);
+      if (!f) { y0 = null; return; }
+      flip = f; dragging = true;
+      stage.setPointerCapture(e.pointerId);
+    }
+    if (dragging) setAngle(flip, Math.max(0, Math.min(180, (Math.abs(dy) / (h * 0.55)) * 180 * Math.sign(-dy * flip.dir))));
+  });
+  const end = e => {
+    if (y0 == null) return;
+    if (dragging && flip) finishFlip(flip, flip.angle > 70);
+    else if (!dragging && e.type === "pointerup") {
+      const card = e.target.closest(".card");
+      if (card) openReader(+card.dataset.id);
+    }
+    y0 = null; dragging = false;
+  };
+  stage.addEventListener("pointerup", end);
+  stage.addEventListener("pointercancel", end);
+  addEventListener("keydown", e => {
+    if (!$("reader").hidden || isDesktop()) return;
+    if (e.key === "ArrowDown" || e.key === " " || e.key === "PageDown") { e.preventDefault(); go(1); }
+    if (e.key === "ArrowUp" || e.key === "PageUp") { e.preventDefault(); go(-1); }
+  });
+})();
+
+/* ---------- desktop grid ---------- */
+function renderGrid(list) {
+  const shapes = ["big", "", "", "tall", "", "wide", "", "", "", "wide", "tall", ""];
+  $("grid").innerHTML = list.map((it, i) => {
+    let s = shapes[i % shapes.length];
+    if (!it.image) s = "";
+    return cardHTML(it, s);
+  }).join("");
+}
+$("grid").addEventListener("click", e => {
+  const card = e.target.closest(".card");
+  if (card) openReader(+card.dataset.id);
+});
+
+/* ---------- render ---------- */
+function render() {
+  const list = visible();
+  $("empty").hidden = list.length > 0;
+  if (!list.length) $("empty").textContent = state.items.length ? "Nothing here yet for this filter." : "Loading your sources…";
+  pages = buildPages(list);
+  state.page = store.get("page:" + state.topic + state.kind, 0);
+  renderStage();
+  renderGrid(list);
+}
+
+function renderTabs() {
+  $("tabs").innerHTML = TOPICS.map(([k, label]) => `<button class="tab" role="tab" data-topic="${k}" aria-selected="${k === state.topic}">${label}</button>`).join("");
+}
+$("tabs").addEventListener("click", e => {
+  const b = e.target.closest(".tab");
+  if (!b) return;
+  state.topic = b.dataset.topic; store.set("topic", state.topic);
+  renderTabs(); render();
+  b.scrollIntoView({ inline: "center", block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+  scrollTo(0, 0);
+});
+document.querySelector(".kinds").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  state.kind = b.dataset.kind; store.set("kind", state.kind);
+  for (const x of document.querySelectorAll(".kinds button")) x.setAttribute("aria-pressed", String(x === b));
+  render();
+});
+
+/* ---------- reader ---------- */
+// Article HTML comes from third-party sites via Readability. Strip anything active.
+function clean(html, base) {
+  const doc = new DOMParser().parseFromString(html || "", "text/html");
+  doc.querySelectorAll("script,style,iframe,object,embed,form,input,button,link,meta,noscript").forEach(n => n.remove());
+  for (const el of doc.body.querySelectorAll("*")) {
+    for (const a of [...el.attributes]) {
+      const n = a.name.toLowerCase(), v = a.value.trim().toLowerCase();
+      if (n.startsWith("on") || n === "style" || n === "srcset" && el.tagName !== "IMG" || (n === "href" || n === "src") && v.startsWith("javascript:")) el.removeAttribute(a.name);
+    }
+    if (el.tagName === "A") { try { el.href = new URL(el.getAttribute("href") || "", base).href; } catch {} el.target = "_blank"; el.rel = "noopener noreferrer"; }
+    if (el.tagName === "IMG") { try { el.src = new URL(el.getAttribute("src") || el.dataset.src || "", base).href; } catch {} el.loading = "lazy"; el.removeAttribute("width"); el.removeAttribute("height"); }
+  }
+  return doc.body.innerHTML;
+}
+
+async function openReader(id) {
+  const it = state.items.find(x => x.id === id);
+  if (!it) return;
+  const r = $("reader"), body = $("rBody");
+  $("rOrig").href = it.url;
+  const meta = `<div class="meta">${KIND_LABEL[it.kind] ? `<span class="k">${KIND_LABEL[it.kind]}</span><span>·</span>` : ""}<b>${esc(it.source_name)}</b><span>·</span><span>${ago(it.published_at)} ago</span>${it.word_count ? `<span>·</span><span>${Math.max(1, Math.round(it.word_count / 230))} min read</span>` : ""}</div>`;
+  const top = it.kind === "youtube" && it.video_id
+    ? `<iframe class="video" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(it.video_id)}?rel=0&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen title="${esc(it.title)}"></iframe>`
+    : it.image ? `<img class="hero" src="${esc(it.image)}" alt="">` : "";
+  body.innerHTML = `${top}<h1>${esc(it.title)}</h1>${meta}<div id="rText">${it.excerpt ? `<p class="teaser">${esc(it.excerpt)}</p>` : ""}</div>`;
+  r.hidden = false; r.scrollTop = 0;
+  requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add("open")));
+  document.body.style.overflow = "hidden";
+  if (location.hash !== "#read") history.pushState({ read: id }, "", "#read");
+
+  if (it.kind === "youtube") return;
+  try {
+    const [row] = await sb(`tangent_articles?id=eq.${id}&select=body_html,extracted`);
+    if (row?.extracted && row.body_html) {
+      const html = clean(row.body_html, it.url);
+      // Readability often repeats the hero image as the first figure.
+      $("rText").innerHTML = `<div class="prose">${html}</div>`;
+      const first = $("rText").querySelector("img");
+      if (first && it.image && first.src.split("?")[0] === it.image.split("?")[0]) first.closest("figure")?.remove() ?? first.remove();
+    } else {
+      $("rText").insertAdjacentHTML("beforeend", `<div class="notice">Full text was not available for this one. Tap Original to read it on ${esc(it.source_name)}.</div>`);
+    }
+  } catch {
+    $("rText").insertAdjacentHTML("beforeend", `<div class="notice">Could not load the article. Check your connection, or tap Original.</div>`);
+  }
+}
+function closeReader(fromHistory) {
+  const r = $("reader");
+  if (r.hidden) return;
+  r.classList.remove("open");
+  document.body.style.overflow = "";
+  setTimeout(() => { r.hidden = true; $("rBody").replaceChildren(); }, reduceMotion ? 0 : 320);
+  if (!fromHistory && location.hash === "#read") history.back();
+}
+$("rClose").addEventListener("click", () => closeReader(false));
+addEventListener("popstate", () => { closeReader(true); if (location.hash !== "#sources") closeSources(true); });
+addEventListener("keydown", e => { if (e.key === "Escape") { closeReader(false); closeSources(false); } });
+
+/* ---------- sources sheet (health) ---------- */
+let sourcesOpen = false;
+async function openSources() {
+  const r = $("reader"), body = $("rBody");
+  sourcesOpen = true;
+  $("rOrig").hidden = true;
+  body.innerHTML = `<h1>Sources</h1><p class="meta">Green fetched on the last run. Red failed; the reason is underneath.</p><div id="srcList">Loading…</div>`;
+  r.hidden = false; r.scrollTop = 0;
+  requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add("open")));
+  document.body.style.overflow = "hidden";
+  history.pushState({ sources: 1 }, "", "#sources");
+  try {
+    const rows = await sb("tangent_sources?select=name,kind,topic,site_url,enabled,disabled_reason,last_ok_at,last_run_at,last_strategy,last_count,last_error&order=topic,name");
+    const by = {};
+    for (const s of rows) (by[s.topic] ||= []).push(s);
+    $("srcList").innerHTML = TOPICS.filter(([k]) => by[k]).map(([k, label]) => `<div class="sec">${label}</div><ul class="list">${by[k].map(s => {
+      const cls = !s.enabled ? "off" : s.last_error ? "bad" : s.last_ok_at ? "ok" : "off";
+      const sub = !s.enabled ? (s.disabled_reason || "Disabled")
+        : s.last_error ? s.last_error
+        : s.last_ok_at ? `${s.last_strategy} · ${s.last_count} items · ${ago(s.last_ok_at)} ago`
+        : "Not fetched yet";
+      return `<li><span class="n">${esc(s.name)}${KIND_LABEL[s.kind] ? ` <span class="meta" style="display:inline">· ${KIND_LABEL[s.kind]}</span>` : ""}</span><span class="dot ${cls}"></span><span class="s">${esc(sub)}</span></li>`;
+    }).join("")}</ul>`).join("");
+  } catch (e) {
+    $("srcList").textContent = "Could not load sources.";
+  }
+}
+function closeSources(fromHistory) {
+  if (!sourcesOpen) return;
+  sourcesOpen = false;
+  $("rOrig").hidden = false;
+  closeReader(true);
+  if (!fromHistory && location.hash === "#sources") history.back();
+}
+$("sourcesBtn").addEventListener("click", openSources);
+$("rClose").addEventListener("click", () => closeSources(false));
+
+/* ---------- load ---------- */
+async function load() {
+  try {
+    const rows = await sb("tangent_feed?select=*&order=published_at.desc&limit=400");
+    state.items = rows;
+    store.set("feed", rows);
+    render();
+  } catch (e) {
+    if (!state.items.length) { $("empty").hidden = false; $("empty").textContent = "Could not reach the news server. Pull to retry when you are back online."; }
+  }
+}
+
+if (location.hash) history.replaceState(null, "", location.pathname);
+renderTabs();
+for (const x of document.querySelectorAll(".kinds button")) x.setAttribute("aria-pressed", String(x.dataset.kind === state.kind));
+render();
+load();
+setInterval(load, 10 * 60e3);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") load(); });
+addEventListener("resize", () => { if (!flip) renderStage(); });
+
+if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+</script>
+</body>
+</html>

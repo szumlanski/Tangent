@@ -1,0 +1,147 @@
+// One fetch pass over every enabled source. Run by GitHub Actions every 15 min.
+import { get, pool } from "./http.js";
+import { rss } from "./strategies/rss.js";
+import { gnews, decode } from "./strategies/gnews.js";
+import { sitemap } from "./strategies/sitemap.js";
+import { scrape } from "./strategies/scrape.js";
+import { extract, plain } from "./extract.js";
+import { isBlockedDomain } from "./paywall.js";
+import * as db from "./db.js";
+
+const STRATEGIES = { rss, gnews, sitemap, scrape };
+// News goes stale fast; videos and blogs post less often.
+const MAX_AGE = { news: 3 * 864e5, blog: 14 * 864e5, youtube: 14 * 864e5, podcast: 14 * 864e5 };
+const MAX_NEW_PER_SOURCE = 15;
+
+// Try each strategy in order; the first that returns items wins.
+async function discover(source) {
+  const order = source.kind === "youtube" ? ["rss"] : source.strategies;
+  const errors = [];
+  for (const name of order) {
+    if (name === "rss" && !source.feed_url) continue;
+    try {
+      const items = await STRATEGIES[name](source);
+      if (items.length) return { strategy: name, items };
+      errors.push(`${name}: empty`);
+    } catch (e) {
+      errors.push(`${name}: ${e.message}`);
+    }
+  }
+  throw new Error(errors.join("; ") || "no strategies");
+}
+
+async function isShort(videoId) {
+  const r = await fetch(`https://www.youtube.com/shorts/${videoId}`, { method: "HEAD", redirect: "manual" }).catch(() => null);
+  return r?.status === 200;
+}
+
+async function processSource(source) {
+  try {
+    return await processSourceInner(source);
+  } catch (e) {
+    await db.updateSource(source.id, { last_run_at: new Date().toISOString(), last_error: e.message.slice(0, 500) }).catch(() => {});
+    return { source: source.name, error: e.message };
+  }
+}
+
+async function processSourceInner(source) {
+  const started = new Date().toISOString();
+  let found;
+  try {
+    found = await discover(source);
+  } catch (e) {
+    await db.updateSource(source.id, { last_run_at: started, last_error: e.message.slice(0, 500) });
+    return { source: source.name, error: e.message };
+  }
+
+  const fresh = found.items.filter(i => i.url && (!i.published || Date.now() - Date.parse(i.published) < MAX_AGE[source.kind]));
+  const have = await db.known(fresh.map(i => i.url));
+  const todo = fresh.filter(i => !have.has(i.url)).slice(0, MAX_NEW_PER_SOURCE);
+
+  const rows = [];
+  let paywalled = 0;
+  for (const it of todo) {
+    try {
+      const row = {
+        source_id: source.id,
+        kind: source.kind,
+        url: it.url,
+        origin_url: it.gnews || null,
+        title: it.title,
+        excerpt: it.excerpt || null,
+        image: it.image || null,
+        author: it.author || null,
+        published_at: it.published ? new Date(it.published).toISOString() : started,
+      };
+      if (source.kind === "youtube") {
+        if (it.videoId && (await isShort(it.videoId))) continue;
+        row.video_id = it.videoId;
+        rows.push(row);
+        continue;
+      }
+      if (it.gnews) row.url = await decode(it.gnews);
+      if (isBlockedDomain(row.url)) continue;
+
+      const ex = await extract(row.url).catch(e => ({ error: e.message }));
+      if (ex.paywall) {
+        row.paywalled = true;
+        row.paywall_reason = ex.paywall;
+        paywalled++;
+      } else if (!ex.error) {
+        row.url = ex.url || row.url;
+        // Scraped link text is unreliable; the page's own title is better.
+        if (found.strategy === "scrape" || !row.title) row.title = ex.title || row.title;
+        row.image = row.image || ex.image;
+        row.author = row.author || ex.author;
+        row.excerpt = row.excerpt || ex.excerpt?.slice(0, 400) || null;
+        if (!it.published && ex.published) row.published_at = new Date(ex.published).toISOString();
+        if (ex.bodyHtml && ex.wordCount >= 120) {
+          row.body_html = ex.bodyHtml;
+          row.word_count = ex.wordCount;
+          row.extracted = true;
+        }
+      }
+      row.title = plain(row.title);
+      row.excerpt = plain(row.excerpt)?.slice(0, 400) || null;
+      if (!row.title) continue;
+      rows.push(row);
+    } catch (e) {
+      console.warn(`  ${source.name}: ${it.url}: ${e.message}`);
+    }
+  }
+
+  // A redirect can land two items on the same URL; keep the first.
+  const unique = [...new Map(rows.map(r => [r.url, r])).values()];
+  await db.insertArticles(unique);
+
+  const items_seen = source.items_seen + unique.length;
+  const paywall_seen = source.paywall_seen + paywalled;
+  const patch = {
+    last_run_at: started,
+    last_ok_at: started,
+    last_strategy: found.strategy,
+    last_count: found.items.length,
+    last_error: null,
+    items_seen,
+    paywall_seen,
+  };
+  if (items_seen >= 10 && paywall_seen / items_seen > 0.8) {
+    patch.enabled = false;
+    patch.disabled_reason = `auto: ${paywall_seen} of ${items_seen} articles paywalled`;
+  }
+  await db.updateSource(source.id, patch);
+  return { source: source.name, strategy: found.strategy, found: found.items.length, added: unique.length, paywalled };
+}
+
+const all = await db.sources();
+const only = process.argv[2];
+const list = only ? all.filter(s => s.name.toLowerCase().includes(only.toLowerCase())) : all;
+console.log(`Fetching ${list.length} sources`);
+const results = await pool(list, 6, processSource);
+for (const r of results) console.log(r.error instanceof Error ? `ERR ${r.error.message}` : JSON.stringify(r));
+if (process.env.DRY === "1") {
+  const rows = db.dryRows;
+  console.log(`\nDRY: ${rows.length} rows, ${rows.filter(r => r.extracted).length} full text, ${rows.filter(r => r.paywalled).length} paywalled`);
+  for (const r of rows.filter(r => r.paywalled)) console.log(`  locked (${r.paywall_reason}): ${r.url}`);
+  if (process.env.DRY_OUT) (await import("node:fs")).writeFileSync(process.env.DRY_OUT, JSON.stringify(rows));
+}

@@ -1,0 +1,18 @@
+{
+  "name": "tangent",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "fetch": "node fetcher/run.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "fast-xml-parser": "^5.11.2",
+    "linkedom": "^0.18.13",
+    "undici": "^8.12.2"
+  }
+}
