@@ -138,6 +138,15 @@ a { color: inherit; }
 .prose blockquote { margin: 16px 0; padding-left: 16px; border-left: 3px solid var(--accent); color: var(--label-2); }
 .prose pre { overflow-x: auto; font-size: 14px; background: var(--card); padding: 12px; border-radius: 8px; }
 .prose table { display: block; overflow-x: auto; }
+.racts { display: flex; align-items: center; }
+.racts .icon-btn[aria-pressed="true"] { color: var(--tint); }
+.racts .icon-btn[aria-pressed="true"] svg { fill: currentColor; fill-opacity: .18; }
+.card .x { position: absolute; top: 6px; right: 6px; z-index: 2; width: 32px; height: 32px; border-radius: 16px; display: grid; place-items: center; background: rgba(0,0,0,.45); color: #fff; }
+.card .x::after { content: ""; position: absolute; inset: -6px; } /* 44px touch target */
+.card .x svg { width: 16px; height: 16px; }
+.card.noimg .x, .card.small .x { background: var(--sep); color: var(--label-2); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar) + 14px); z-index: 50; display: flex; align-items: center; gap: 14px; background: var(--label); color: var(--bg); padding: 10px 10px 10px 16px; border-radius: 22px; font-size: 15px; box-shadow: 0 6px 20px var(--shade); max-width: calc(100% - 32px); }
+.toast button { color: var(--accent); font-weight: 700; height: 32px; padding: 0 10px; }
 .sum, .also { background: var(--card); border-radius: 12px; padding: 12px 16px; margin: 0 0 18px; }
 .sum-h { font-size: 13px; font-weight: 700; color: var(--tint); margin-bottom: 6px; }
 .sum ul { margin: 0; padding-left: 20px; font-size: 16px; line-height: 1.45; }
@@ -285,13 +294,19 @@ details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; m
 <main class="view" id="stocksView" hidden></main>
 <main class="view" id="sportsView" hidden></main>
 <div class="empty" id="empty" hidden></div>
+<div class="toast" id="toast" role="status" hidden><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
 
 <section class="reader" id="reader" aria-modal="true" role="dialog" aria-label="Article" hidden>
   <div class="rbar">
     <button class="icon-btn" id="rClose" aria-label="Close">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
     </button>
-    <a class="pill" id="rOrig" target="_blank" rel="noopener noreferrer">Original</a>
+    <div class="racts" id="rActs">
+      <button class="icon-btn" data-vote="1" aria-label="More like this" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 10v11H3V10zM7 10l4-8a2.5 2.5 0 0 1 3 2.5V9h5.5a2 2 0 0 1 2 2.3l-1.3 8A2 2 0 0 1 18.2 21H7"/></svg></button>
+      <button class="icon-btn" data-vote="-1" aria-label="Fewer like this" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M17 14V3h4v11zM17 14l-4 8a2.5 2.5 0 0 1-3-2.5V15H4.5a2 2 0 0 1-2-2.3l1.3-8A2 2 0 0 1 5.8 3H17"/></svg></button>
+      <button class="icon-btn" data-hide-reader aria-label="Hide this story"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-3 3.8M6.2 6.2C3.8 7.9 2.5 12 2.5 12S6 19 12 19a9.6 9.6 0 0 0 5.3-1.5M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
+      <a class="pill" id="rOrig" target="_blank" rel="noopener noreferrer">Original</a>
+    </div>
   </div>
   <div class="rscroll" id="rScroll"><article class="rbody" id="rBody"></article></div>
 </section>
@@ -351,7 +366,7 @@ function diversify(items) {
 }
 
 function visible() {
-  const list = state.items.filter(i => i.topic !== "sports" && (!state.topic || i.topic === state.topic) && (!state.kind || i.kind === state.kind));
+  const list = state.items.filter(i => i.topic !== "sports" && !isHidden(i) && (!state.topic || i.topic === state.topic) && (!state.kind || i.kind === state.kind));
   // One card per story. Articles not grouped yet fall back to a headline match.
   const groups = new Map();
   for (const i of list) {
@@ -364,7 +379,11 @@ function visible() {
     const lead = members.find(m => m.image && m.extracted) || members.find(m => m.image) || members[0];
     return { ...lead, members, newest: members.reduce((t, m) => m.published_at > t ? m.published_at : t, lead.published_at) };
   });
-  cards.sort((a, b) => b.newest.localeCompare(a.newest));
+  // Freshness decays over about a day and a half; your votes shift a story by hours, not days:
+  // 3 thumbs-down on a source is like its stories being ~3 hours older, 10 is ~7 hours.
+  const now = Date.now();
+  for (const c of cards) c.rank = Math.exp(-(now - Date.parse(c.newest)) / 36e5 / 36) * Math.exp(0.4 * prefScore(c));
+  cards.sort((a, b) => b.rank - a.rank);
   return diversify(cards);
 }
 
@@ -377,6 +396,7 @@ function cardHTML(it, size) {
   const blurb = it.summary_short || it.excerpt;
   const play = it.kind === "youtube" ? `<span class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>${dur(it.duration_s) || "Play"}</span>` : "";
   return `<button class="card ${size || ""} ${hasImg ? "" : "noimg"}" data-id="${it.id}">
+    <span class="x" role="button" aria-label="Hide this story" data-hide="${it.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></span>
     ${hasImg ? `<div class="img" style="background-image:url('${esc(it.image).replace(/'/g, "%27")}')">${play}</div>` : ""}
     <div class="txt">
       <div class="meta">${kind}<b>${esc(it.source_name)}</b><span>·</span><span>${ago(it.newest || it.published_at)}</span>${many}</div>
@@ -506,6 +526,8 @@ function go(dir) {
     if (y0 == null) return;
     if (dragging && flip) finishFlip(flip, flip.angle > 70);
     else if (!dragging && e.type === "pointerup" && !e.target.closest("a")) {
+      const x = e.target.closest("[data-hide]");
+      if (x) { hideStory(+x.dataset.hide); y0 = null; return; }
       const card = e.target.closest(".card");
       if (card) openReader(+card.dataset.id);
     }
@@ -530,6 +552,8 @@ function renderGrid(list) {
   }).join("");
 }
 $("grid").addEventListener("click", e => {
+  const x = e.target.closest("[data-hide]");
+  if (x) return hideStory(+x.dataset.hide);
   const card = e.target.closest(".card");
   if (card) openReader(+card.dataset.id);
 });
@@ -586,6 +610,8 @@ async function openReader(id, swap = false) {
   if (!it) return;
   const r = $("reader"), body = $("rBody");
   $("rOrig").href = it.url;
+  $("reader").dataset.id = id;
+  syncVoteButtons(id);
   const meta = `<div class="meta">${KIND_LABEL[it.kind] ? `<span class="k">${KIND_LABEL[it.kind]}</span><span>·</span>` : ""}<b>${esc(it.source_name)}</b><span>·</span><span>${ago(it.published_at)} ago</span>${it.word_count ? `<span>·</span><span>${Math.max(1, Math.round(it.word_count / 230))} min read</span>` : ""}</div>`;
   const top = it.kind === "youtube" && it.video_id
     ? `<iframe class="video" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(it.video_id)}?rel=0&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen title="${esc(it.title)}"></iframe>`
@@ -639,7 +665,7 @@ let sourcesOpen = false;
 async function openSources() {
   const r = $("reader"), body = $("rBody");
   sourcesOpen = true;
-  $("rOrig").hidden = true;
+  $("rActs").hidden = true;
   body.innerHTML = `<h1>Sources</h1><div id="suggList"></div><p class="meta">Green fetched on the last run. Red failed; the reason is underneath.</p><div id="srcList">Loading…</div>`;
   renderSuggestions();
   r.hidden = false; $("rScroll").scrollTop = 0;
@@ -665,7 +691,7 @@ async function openSources() {
 function closeSources(fromHistory) {
   if (!sourcesOpen) return;
   sourcesOpen = false;
-  $("rOrig").hidden = false;
+  $("rActs").hidden = false;
   closeReader(true);
   if (!fromHistory && location.hash === "#sources") history.back();
 }
@@ -887,7 +913,7 @@ async function renderSports() {
     ...(nflNews?.articles || []).map(a => ({ ...a, league: "NFL" })),
     ...otherNews.flat(),
   ].filter(a => a.headline);
-  const highlights = state.items.filter(i => i.topic === "sports" && i.kind === "youtube").slice(0, 16);
+  const highlights = state.items.filter(i => i.topic === "sports" && i.kind === "youtube" && !isHidden(i)).slice(0, 16);
   const ap = poll?.rankings?.find(r => /AP/.test(r.name)) || poll?.rankings?.[0];
 
   v.innerHTML = `
@@ -905,9 +931,114 @@ async function renderSports() {
   `;
 }
 $("sportsView").addEventListener("click", e => {
+  const x = e.target.closest("[data-hide]");
+  if (x) return hideStory(+x.dataset.hide);
   const card = e.target.closest(".card");
   if (card) openReader(+card.dataset.id);
 });
+
+/* ---------- feedback: hide, thumbs up/down, learned ranking ---------- */
+// Rows mirror tangent_get_feedback. Saved on this device right away, and to the database
+// when the owner key is present, so hides and votes follow you across devices.
+let feedback = store.get("feedback", []);
+let prefs = {}, hiddenStories = new Set(), hiddenArticles = new Set(), votes = new Map();
+const STOP = new Set("the and for with from that this into over after about what when where will have has are was were its his her their they you your our new more says said how why who can could would than just also amid".split(" "));
+const fwords = t => [...new Set((t || "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(" ").filter(w => w.length > 3 && !STOP.has(w)))];
+
+// Each thing you vote on (source, topic, format, headline words) gets a score from -1 to 1,
+// shrunk toward 0 until there are a few votes behind it. Hiding counts as a mild "less".
+function learn() {
+  hiddenStories = new Set(); hiddenArticles = new Set(); votes = new Map();
+  const acc = new Map();
+  const add = (k, v) => { const a = acc.get(k) || { s: 0, n: 0 }; a.s += v; a.n += 1; acc.set(k, a); };
+  for (const r of feedback) {
+    if (r.hidden) { hiddenArticles.add(r.article_id); if (r.cluster_id) hiddenStories.add(r.cluster_id); }
+    if (r.vote) votes.set(r.article_id, r.vote);
+    const v = r.vote || (r.hidden ? -0.25 : 0);
+    if (!v) continue;
+    add("s" + r.source_id, v); add("t" + r.topic, v); add("k" + r.kind, v);
+    for (const w of fwords(r.title)) add("w" + w, v);
+  }
+  prefs = {};
+  // Needs several votes before any one source, topic or word moves much.
+  for (const [k, a] of acc) prefs[k] = a.s / (a.n + 5);
+}
+function prefScore(it) {
+  const p = k => prefs[k] || 0;
+  const ws = fwords(it.story_headline || it.title).map(w => p("w" + w)).filter(Boolean).sort((a, b) => Math.abs(b) - Math.abs(a)).slice(0, 3);
+  const words = ws.length ? ws.reduce((a, b) => a + b, 0) / ws.length : 0;
+  // Source and headline words carry most of it; topic and format only lean.
+  return 0.5 * p("s" + it.source_id) + 0.15 * p("t" + it.topic) + 0.1 * p("k" + it.kind) + 0.4 * words;
+}
+const isHidden = it => hiddenArticles.has(it.id) || (it.cluster_id && hiddenStories.has(it.cluster_id));
+
+async function saveFeedback(it, change) {
+  let row = feedback.find(r => r.article_id === it.id);
+  if (!row) { row = { article_id: it.id, cluster_id: it.cluster_id, vote: 0, hidden: false, source_id: it.source_id, topic: it.topic, kind: it.kind, title: it.title }; feedback.unshift(row); }
+  Object.assign(row, change, { at: new Date().toISOString() });
+  store.set("feedback", feedback);
+  learn();
+  const key = store.get("ownerKey", "");
+  if (!key) return;
+  try {
+    await rpc("tangent_set_feedback", { p_key: key, p_article: it.id, p_vote: change.vote ?? null, p_hidden: change.hidden ?? null });
+  } catch {
+    toast("Saved on this phone only. Could not reach the server.");
+  }
+}
+async function loadFeedback() {
+  const key = store.get("ownerKey", "");
+  if (!key) return;
+  try {
+    feedback = await rpc("tangent_get_feedback", { p_key: key });
+    store.set("feedback", feedback);
+    learn();
+    if (view === "news") render();
+  } catch {}
+}
+
+let toastTimer, undoFn;
+function toast(msg, undo) {
+  $("toastMsg").textContent = msg;
+  $("toastUndo").hidden = !undo;
+  undoFn = undo;
+  $("toast").hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { $("toast").hidden = true; undoFn = null; }, 6000);
+}
+$("toastUndo").addEventListener("click", () => { const f = undoFn; $("toast").hidden = true; undoFn = null; if (f) f(); });
+
+function hideStory(id) {
+  const it = state.items.find(x => x.id === id);
+  if (!it) return;
+  saveFeedback(it, { hidden: true });
+  if (!$("reader").hidden) closeReader(false);
+  rerender();
+  toast("Story hidden", () => { saveFeedback(it, { hidden: false }); rerender(); });
+}
+function vote(id, v) {
+  const it = state.items.find(x => x.id === id);
+  if (!it) return;
+  const next = votes.get(id) === v ? 0 : v; // tapping again clears the vote
+  saveFeedback(it, { vote: next });
+  syncVoteButtons(id);
+  if (next === 1) toast("More stories like this");
+  else if (next === -1) toast("Fewer stories like this", () => { saveFeedback(it, { vote: 0 }); syncVoteButtons(id); });
+}
+function syncVoteButtons(id) {
+  for (const b of document.querySelectorAll("#rActs [data-vote]")) b.setAttribute("aria-pressed", String(votes.get(id) === +b.dataset.vote));
+}
+function rerender() {
+  if (view === "news") render();
+  if (view === "sports" && $("sportsView").dataset.built) renderSports();
+}
+$("rActs").addEventListener("click", e => {
+  const id = +$("reader").dataset.id;
+  const v = e.target.closest("[data-vote]");
+  if (v) return vote(id, +v.dataset.vote);
+  if (e.target.closest("[data-hide-reader]")) hideStory(id);
+});
+learn();
 
 /* ---------- source suggestions (owner only) ---------- */
 // The owner key arrives once via #key=... and stays on this device.
@@ -968,7 +1099,8 @@ for (const x of document.querySelectorAll(".kinds button")) x.setAttribute("aria
 render();
 load();
 loadTrends();
-setInterval(() => { load(); loadTrends(); }, 10 * 60e3);
+loadFeedback();
+setInterval(() => { load(); loadTrends(); loadFeedback(); }, 10 * 60e3);
 // Quotes and scores refresh every minute while their tab is open.
 setInterval(() => { if (document.visibilityState !== "visible") return; if (view === "stocks") loadStocks(); if (view === "sports") renderSports(); }, 60e3);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { load(); loadTrends(); } });
