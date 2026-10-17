@@ -117,7 +117,9 @@ async function processSourceInner(source) {
 
   // A redirect can land two items on the same URL; keep the first. A bulk insert
   // needs identical keys on every row, so fill in the optional columns.
-  const unique = [...new Map(rows.map(r => [r.url, { ...ROW_DEFAULTS, ...r }])).values()];
+  // Postgres text cannot hold NUL characters, which a few pages contain.
+  const clean = r => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, typeof v === "string" ? v.replaceAll("\0", "") : v]));
+  const unique = [...new Map(rows.map(r => [r.url, clean({ ...ROW_DEFAULTS, ...r })])).values()];
   await db.insertArticles(unique);
 
   const items_seen = source.items_seen + unique.length;
