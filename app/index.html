@@ -519,6 +519,7 @@ function visible() {
 /* ---------- cards ---------- */
 const ICON_LOCK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`;
 // Hide is one action everywhere (feed card and story view), so it has one icon.
+const ICON_SHARE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg>`;
 const ICON_HIDE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-3 3.8M6.2 6.2C3.8 7.9 2.5 12 2.5 12S6 19 12 19a9.6 9.6 0 0 0 5.3-1.5M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>`;
 const ICON_UP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 10v11H3V10zM7 10l4-8a2.5 2.5 0 0 1 3 2.5V9h5.5a2 2 0 0 1 2 2.3l-1.3 8A2 2 0 0 1 18.2 21H7"/></svg>`;
 const ICON_DOWN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M17 14V3h4v11zM17 14l-4 8a2.5 2.5 0 0 1-3-2.5V15H4.5a2 2 0 0 1-2-2.3l1.3-8A2 2 0 0 1 5.8 3H17"/></svg>`;
@@ -535,6 +536,7 @@ function cardHTML(it, size) {
       <span role="button" aria-label="More like this" aria-pressed="${votes.get(it.id) === 1}" data-cvote="1" data-for="${it.id}">${ICON_UP}</span>
       <span role="button" aria-label="Fewer like this" aria-pressed="${votes.get(it.id) === -1}" data-cvote="-1" data-for="${it.id}">${ICON_DOWN}</span>
       <span role="button" aria-label="Hide this story" data-hide="${it.id}">${ICON_HIDE}</span>
+      <span role="button" aria-label="Share this story" data-share="${it.id}">${ICON_SHARE}</span>
     </span>
     ${hasImg ? `<div class="img" style="background-image:url('${esc(it.image).replace(/'/g, "%27")}')">${play}</div>` : ""}
     <div class="txt">
@@ -667,6 +669,8 @@ function go(dir) {
     else if (!dragging && e.type === "pointerup" && !e.target.closest("a")) {
       const x = e.target.closest("[data-hide]");
       if (x) { hideStory(+x.dataset.hide); y0 = null; return; }
+      const sh = e.target.closest("[data-share]");
+      if (sh) { shareArticle(+sh.dataset.share); y0 = null; return; }
       const cv = e.target.closest("[data-cvote]");
       if (cv) { vote(+cv.dataset.for, +cv.dataset.cvote); y0 = null; return; }
       const card = e.target.closest(".card");
@@ -695,6 +699,8 @@ function renderGrid(list) {
 $("grid").addEventListener("click", e => {
   const x = e.target.closest("[data-hide]");
   if (x) return hideStory(+x.dataset.hide);
+  const sh = e.target.closest("[data-share]");
+  if (sh) return shareArticle(+sh.dataset.share);
   const cv = e.target.closest("[data-cvote]");
   if (cv) return vote(+cv.dataset.for, +cv.dataset.cvote);
   const card = e.target.closest(".card");
@@ -1155,6 +1161,8 @@ $("sportsView").addEventListener("click", e => {
   if (e.target.closest('[data-edit="teams"]')) return openTeams();
   const x = e.target.closest("[data-hide]");
   if (x) return hideStory(+x.dataset.hide);
+  const sh = e.target.closest("[data-share]");
+  if (sh) return shareArticle(+sh.dataset.share);
   const cv = e.target.closest("[data-cvote]");
   if (cv) return vote(+cv.dataset.for, +cv.dataset.cvote);
   const card = e.target.closest(".card");
