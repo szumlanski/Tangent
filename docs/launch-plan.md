@@ -40,12 +40,12 @@ non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
 - [ ] 9. Admin: Jason can remove or disable any source, see user and source counts, retire the owner-key link.
 - [ ] 10. Housekeeping for a public app: privacy policy, terms, account deletion, data retention (drop article bodies
       after 21 days, articles after 60) to stay inside the free database, security review of the new endpoints.
-- [ ] 11. Domain: attach tangentreads.com to the Pages project once Jason buys it; redirects from the old address.
+- [ ] 11. Domain: tangentreads.com and www attached and live (done 2026-10-18). Remaining: redirect www and tangent.szumlanski.com to tangentreads.com after accounts ship (the owner key is stored per address).
 
 ## Steps only Jason can do (collected here, given to him one at a time at the end)
-- Buy tangentreads.com (Cloudflare Registrar in the szumlanski.com account, so DNS lands there).
 - Create a Google OAuth client (Google Cloud Console) and paste its ID and secret into Cloudflare.
 - Optional: Resend account for password-reset emails (free 3,000/month).
 
 ## Log
 - 2026-10-18 item 1: app loads each topic's newest 160 (sports 60) separately. Vermont went from 2 visible stories to 82. Shelves (item 6) will move this server-side per user.
+- 2026-10-18 domain: Jason registered tangentreads.com; attached apex and www to the Pages project with proxied CNAMEs, apex active and serving.
