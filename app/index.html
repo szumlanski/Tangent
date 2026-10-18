@@ -340,6 +340,7 @@ details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; m
 .pushbox .bigbtn { margin: 0; }
 .pushbox .row { display: flex; gap: 8px; flex-wrap: wrap; }
 .pushbox .row .bigbtn { flex: 1 1 140px; }
+.edit-link { float: right; font: 600 16px var(--f-ui); color: var(--tint); min-height: 44px; padding: 0 4px; margin-top: -8px; }
 .backlink { min-height: 44px; color: var(--tint); font-weight: 600; margin: -6px 0 4px -2px; }
 .bigbtn.danger { color: var(--down); }
 .faq h2 { font: 700 22px/1.2 var(--f-head); margin: 28px 0 6px; }
@@ -860,6 +861,7 @@ function openPanel(name, html) {
 let ownBack = false;
 function closePanel(fromHistory) {
   if (!panel) return;
+  if (panel === "tickers" || panel === "teams") setTimeout(rebuildViews, 0);
   panel = "";
   $("rActs").hidden = false;
   closeReader(true);
@@ -937,7 +939,18 @@ $("sections").addEventListener("click", e => {
 $("logo").addEventListener("click", () => view === "news" ? toTop() : setView("news"));
 
 /* ---------- stocks ---------- */
-const TICKERS = [["SPX", "S&P 500"], ["COMP", "Nasdaq"], ["DJI", "Dow Jones"], ["VOO", "VOO"], ["SCHB", "SCHB"], ["KO", "Coca-Cola"]];
+// Tickers and teams belong to the persona (or, without an account, to this device).
+const DEFAULT_TICKERS = [["SPX", "S&P 500"], ["COMP", "Nasdaq"], ["DJI", "Dow Jones"]];
+const mySettings = () => me?.user ? (curPersona()?.settings || {}) : store.get("guestSettings", {});
+const myTickers = () => mySettings().tickers || DEFAULT_TICKERS;
+const myTeams = () => mySettings().teams || [];
+async function saveSettings(patch) {
+  const next = { ...mySettings(), ...patch };
+  if (me?.user) { await api("personas/save", { id: me.persona, settings: next }); setMe(await api("me")); }
+  else store.set("guestSettings", next);
+  $("stocksView").dataset.built = ""; $("sportsView").dataset.built = "";
+}
+const qid = sym => "q-" + sym.replace(/[^A-Za-z0-9]/g, "_");
 const RANGE_LABEL = [["1d", "1D"], ["7d", "7D"], ["1m", "1M"], ["6m", "6M"], ["1y", "1Y"], ["5y", "5Y"]];
 let stockRange = store.get("range", "1d");
 const charts = {};
@@ -948,12 +961,13 @@ function renderStocks() {
   const v = $("stocksView");
   if (!v.dataset.built) {
     v.dataset.built = 1;
-    v.innerHTML = `<h2>Markets <small id="mktNote">Delayed 15 min</small></h2>
+    v.innerHTML = `<h2>Markets <small id="mktNote">Delayed 15 min</small><button class="edit-link" data-edit="tickers">Edit</button></h2>
       <div class="ranges" role="group" aria-label="Range">${RANGE_LABEL.map(([k, l]) => `<button data-r="${k}" aria-pressed="${k === stockRange}">${l}</button>`).join("")}</div>
-      <div class="quotes">${TICKERS.map(([sym, nm]) => `<section class="panel quote" id="q-${sym}">
-        <div class="top"><span class="nm">${esc(nm)}</span><span class="px">–</span><span class="sub">${sym === "SPX" || sym === "COMP" || sym === "DJI" ? "Index" : sym === "KO" ? "KO · NYSE" : sym + " · ETF"}</span><span class="chg day">&nbsp;</span></div>
+      <div class="quotes">${myTickers().map(([sym, nm]) => `<section class="panel quote" id="${qid(sym)}">
+        <div class="top"><span class="nm">${esc(nm)}</span><span class="px">–</span><span class="sub">${esc(sym)}</span><span class="chg day">&nbsp;</span></div>
         <div class="chart"><svg aria-hidden="true"></svg><div class="tip" hidden></div><div class="axis"><span class="a0"></span><span class="rc"></span><span class="a1"></span></div></div>
       </section>`).join("")}</div>`;
+    v.querySelector('[data-edit="tickers"]').addEventListener("click", openTickers);
     v.querySelector(".ranges").addEventListener("click", e => {
       const b = e.target.closest("button");
       if (!b) return;
@@ -961,18 +975,22 @@ function renderStocks() {
       for (const x of v.querySelectorAll(".ranges button")) x.setAttribute("aria-pressed", String(x === b));
       loadStocks();
     });
-    for (const [sym] of TICKERS) wireScrub(sym);
+    for (const [sym] of myTickers()) wireScrub(sym);
   }
   loadStocks();
 }
 async function loadStocks() {
-  await Promise.all(TICKERS.map(async ([sym]) => {
-    const el = $("q-" + sym);
+  await Promise.all(myTickers().map(async ([sym]) => {
+    const el = $(qid(sym));
+    if (!el) return;
     try {
       const r = await fetch(`/api/chart?sym=${sym}&range=${stockRange}`);
       const d = await r.json();
       if (d.error) throw new Error(d.error);
       charts[sym] = d;
+      el.querySelector(".sub").textContent = d.type === "INDEX" ? "Index" : `${sym}${d.exchange ? " \u00b7 " + d.exchange : ""}`;
+      // Saved under its symbol when the lookup had no company name; show the name once a source has it.
+      if (d.name && d.name !== sym && el.querySelector(".nm").textContent === sym) el.querySelector(".nm").textContent = d.name;
       drawQuote(sym);
     } catch {
       el.querySelector(".rc").textContent = "Could not load";
@@ -980,7 +998,7 @@ async function loadStocks() {
   }));
 }
 function drawQuote(sym) {
-  const d = charts[sym], el = $("q-" + sym);
+  const d = charts[sym], el = $(qid(sym));
   const dec = d.last > 1000 ? 2 : 2;
   el.querySelector(".px").textContent = fmt(d.last, dec);
   const day = el.querySelector(".day");
@@ -1000,8 +1018,8 @@ function drawQuote(sym) {
   const col = up ? "var(--up)" : "var(--down)";
   const prevY = stockRange === "1d" && d.prev >= lo && d.prev <= hi ? `<line x1="0" x2="${W}" y1="${y(d.prev)}" y2="${y(d.prev)}" stroke="var(--label-2)" stroke-dasharray="3 4" stroke-width="1" opacity=".6"/>` : "";
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  svg.innerHTML = `<defs><linearGradient id="g-${sym}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${up ? "#1d8a43" : "#d23c25"}" stop-opacity=".22"/><stop offset="1" stop-color="${up ? "#1d8a43" : "#d23c25"}" stop-opacity="0"/></linearGradient></defs>
-    ${prevY}<path d="${line}L${x(d.points.length - 1).toFixed(1)},${H}L0,${H}Z" fill="url(#g-${sym})"/><path d="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle class="dot" r="4" fill="${col}" cx="0" cy="0" opacity="0"/>`;
+  svg.innerHTML = `<defs><linearGradient id="g-${qid(sym)}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${up ? "#1d8a43" : "#d23c25"}" stop-opacity=".22"/><stop offset="1" stop-color="${up ? "#1d8a43" : "#d23c25"}" stop-opacity="0"/></linearGradient></defs>
+    ${prevY}<path d="${line}L${x(d.points.length - 1).toFixed(1)},${H}L0,${H}Z" fill="url(#g-${qid(sym)})"/><path d="${line}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle class="dot" r="4" fill="${col}" cx="0" cy="0" opacity="0"/>`;
   svg._x = x; svg._y = y; svg._w = W;
   const fd = t => new Date(t).toLocaleDateString("en-US", stockRange === "5y" ? { month: "short", year: "numeric", timeZone: "UTC" } : { month: "short", day: "numeric", timeZone: "UTC" });
   el.querySelector(".a0").textContent = stockRange === "1d" ? "9:30" : fd(t0);
@@ -1012,7 +1030,7 @@ function drawQuote(sym) {
 }
 // Touch or hover the chart to read a price.
 function wireScrub(sym) {
-  const el = $("q-" + sym), box = el.querySelector(".chart"), tip = el.querySelector(".tip");
+  const el = $(qid(sym)), box = el.querySelector(".chart"), tip = el.querySelector(".tip");
   const move = e => {
     const d = charts[sym], svg = box.querySelector("svg");
     if (!d || !svg._x) return;
@@ -1036,7 +1054,9 @@ function wireScrub(sym) {
 
 /* ---------- sports ---------- */
 
-const MY_TEAMS = [["57", "Florida"], ["127", "Michigan State"]];
+// Leagues a team can come from; their ESPN paths double as keys.
+const TEAM_LEAGUES = [["football/nfl", "NFL"], ["football/college-football", "College football"], ["basketball/nba", "NBA"], ["baseball/mlb", "MLB"],
+  ["hockey/nhl", "NHL"], ["basketball/mens-college-basketball", "College basketball"], ["basketball/wnba", "WNBA"], ["soccer/usa.1", "MLS"]];
 const OTHER_LEAGUES = [
   ["basketball/nba", "NBA"], ["hockey/nhl", "NHL"], ["baseball/mlb", "MLB"], ["basketball/wnba", "WNBA"],
   ["soccer/usa.1", "MLS"], ["basketball/mens-college-basketball", "College basketball"],
@@ -1071,8 +1091,8 @@ function gameHTML(ev, opts = {}) {
   </a>`;
 }
 
-async function teamCard([id, label]) {
-  const [t, sched] = await Promise.all([espn(`football/college-football/teams/${id}`), espn(`football/college-football/teams/${id}/schedule`).catch(() => null)]);
+async function teamCard({ league, id }) {
+  const [t, sched] = await Promise.all([espn(`${league}/teams/${id}`), espn(`${league}/teams/${id}/schedule`).catch(() => null)]);
   const team = t.team;
   const evs = sched?.events || [];
   const last = evs.filter(e => e.competitions?.[0]?.status?.type?.state === "post").at(-1);
@@ -1094,7 +1114,7 @@ async function renderSports() {
   if (!v.dataset.built) { v.dataset.built = 1; v.innerHTML = `<p class="muted" style="padding:24px 4px">Loading scores…</p>`; }
   const settle = p => p.then(x => x, () => null);
   const [teams, cfb, poll, nfl, others, cfbNews, nflNews] = await Promise.all([
-    settle(Promise.all(MY_TEAMS.map(teamCard))),
+    settle(Promise.all(myTeams().map(teamCard))),
     settle(espn("football/college-football/scoreboard")),
     settle(espn("football/college-football/rankings")),
     settle(espn("football/nfl/scoreboard")),
@@ -1114,8 +1134,8 @@ async function renderSports() {
   const ap = poll?.rankings?.find(r => /AP/.test(r.name)) || poll?.rankings?.[0];
 
   v.innerHTML = `
-    <h2>Your teams</h2>
-    <div class="teams">${(teams || []).join("") || `<p class="muted">Could not load team info.</p>`}</div>
+    <h2>Your teams<button class="edit-link" data-edit="teams">${myTeams().length ? "Edit" : "Add teams"}</button></h2>
+    <div class="teams">${!myTeams().length ? `<p class="muted">Add the teams you follow to see their scores and schedules first.</p>` : (teams || []).join("") || `<p class="muted">Could not load team info.</p>`}</div>
     ${highlights.length ? `<h2>Highlights</h2><div class="rail">${highlights.map(i => cardHTML(i, "")).join("")}</div>` : ""}
     <h2>College football <small>${esc(cfb?.week?.number ? "Week " + cfb.week.number + " · Top 25" : "Top 25")}</small></h2>
     <div class="games">${(cfb?.events || []).map(e => gameHTML(e)).join("") || `<p class="muted">No ranked games this week.</p>`}</div>
@@ -1128,6 +1148,7 @@ async function renderSports() {
   `;
 }
 $("sportsView").addEventListener("click", e => {
+  if (e.target.closest('[data-edit="teams"]')) return openTeams();
   const x = e.target.closest("[data-hide]");
   if (x) return hideStory(+x.dataset.hide);
   const cv = e.target.closest("[data-cvote]");
@@ -1461,7 +1482,8 @@ async function switchPersona(id) {
   feedback = []; store.del("feedback"); learn();
   state.topic = ""; store.set("topic", "");
   try { setMe(await api("me")); } catch (x) { toast(x.message); return; }
-  renderTabs(); if (view === "news") render(); load(); loadFeedback();
+  $("stocksView").dataset.built = ""; $("sportsView").dataset.built = "";
+  renderTabs(); if (view === "news") render(); load(); loadFeedback(); rebuildViews();
   toast(`Reading as ${curPersona()?.name}`);
   if (!hasShelves() && !store.get("picked:" + me.persona, false)) return openTopics(true);
   if (panel === "account") openAccount();
@@ -1883,6 +1905,64 @@ async function shareArticle(id) {
   catch { prompt("Copy this link to share the story:", url); }
 }
 $("rShare").addEventListener("click", () => shareArticle(+$("reader").dataset.id));
+
+/* ---------- tickers and teams editors ---------- */
+function openTickers() {
+  const list = myTickers();
+  openPanel("tickers", `<h1>Markets</h1><p class="lead">The quotes on your Stocks tab${me?.user ? `, for ${esc(curPersona()?.name || "this persona")}` : ""}. Delayed 15 minutes.</p>
+    <ul class="list srcs" id="tkList">${list.map(([sym, nm]) => `<li><span class="txt"><b>${esc(nm)}</b><span class="sub">${esc(sym)}</span></span><button class="small" data-tk-rm="${esc(sym)}">Remove</button></li>`).join("")}</ul>
+    <form class="inline" id="tkForm"><label class="field"><span>Add a stock, fund or index</span><input id="tkIn" maxlength="12" autocapitalize="characters" autocomplete="off" placeholder="AAPL, VTI, BTC-USD"></label><button class="bigbtn primary">Add</button></form>
+    <p class="ferr" id="tkErr" role="alert"></p>`);
+  $("tkForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const sym = $("tkIn").value.trim().toUpperCase();
+    if (!sym) return;
+    if (myTickers().some(t => t[0] === sym)) { $("tkErr").textContent = "That one is already on your list."; return; }
+    if (myTickers().length >= 12) { $("tkErr").textContent = "You can follow up to 12."; return; }
+    $("tkErr").textContent = "Looking it up…";
+    try {
+      const d = await (await fetch(`/api/chart?sym=${encodeURIComponent(sym)}&range=1d`)).json();
+      if (d.error || !d.last) throw new Error();
+      await saveSettings({ tickers: [...myTickers(), [sym, d.name || sym]] });
+      openTickers();
+    } catch { $("tkErr").textContent = `Could not find ${sym}. Check the ticker symbol.`; }
+  });
+}
+let teamCache = {};
+function openTeams() {
+  openPanel("teams", `<h1>Your teams</h1><p class="lead">Scores and schedules for these show first on your Sports tab.</p>
+    <ul class="list srcs" id="tmList">${myTeams().map(t => `<li><span class="txt"><b>${esc(t.name)}</b><span class="sub">${esc(TEAM_LEAGUES.find(l => l[0] === t.league)?.[1] || "")}</span></span><button class="small" data-tm-rm="${esc(t.league + "/" + t.id)}">Remove</button></li>`).join("") || `<li><span class="txt"><span class="sub">No teams yet.</span></span></li>`}</ul>
+    <div class="sec">Add a team</div>
+    <label class="field"><span>League</span><select id="tmLeague">${TEAM_LEAGUES.map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></label>
+    <label class="field"><span>Team</span><input id="tmQ" autocomplete="off" placeholder="Type a team or city"></label>
+    <p class="ferr" id="tmErr" role="alert"></p><ul class="list srcs" id="tmRes" hidden></ul>`);
+  const search = async () => {
+    const league = $("tmLeague").value, q = $("tmQ").value.trim().toLowerCase();
+    try {
+      teamCache[league] ||= (await espn(`${league}/teams?limit=1000`)).sports[0].leagues[0].teams.map(x => x.team);
+      const have = new Set(myTeams().map(t => t.league + "/" + t.id));
+      const hits = teamCache[league].filter(t => !q || `${t.displayName} ${t.location} ${t.abbreviation} ${t.nickname || ""}`.toLowerCase().includes(q)).slice(0, 12);
+      $("tmRes").innerHTML = hits.map(t => `<li><span class="txt"><b>${esc(t.displayName)}</b></span>${have.has(league + "/" + t.id) ? `<span class="sub">Added</span>` : `<button class="small add" data-tm-add="${esc(t.id)}" data-name="${esc(t.displayName)}">Add</button>`}</li>`).join("") || `<li><span class="txt"><span class="sub">No team by that name.</span></span></li>`;
+      $("tmRes").hidden = false; $("tmErr").textContent = "";
+    } catch { $("tmErr").textContent = "Could not load teams. Check your connection."; }
+  };
+  $("tmLeague").addEventListener("change", search);
+  let t; $("tmQ").addEventListener("input", () => { clearTimeout(t); t = setTimeout(search, 200); });
+}
+$("rBody").addEventListener("click", async e => {
+  const b = e.target.closest("[data-tk-rm],[data-tm-rm],[data-tm-add]");
+  if (!b) return;
+  b.disabled = true;
+  try {
+    if (b.dataset.tkRm) { await saveSettings({ tickers: myTickers().filter(t => t[0] !== b.dataset.tkRm) }); return openTickers(); }
+    if (b.dataset.tmRm) { await saveSettings({ teams: myTeams().filter(t => t.league + "/" + t.id !== b.dataset.tmRm) }); return openTeams(); }
+    if (myTeams().length >= 10) { $("tmErr").textContent = "You can follow up to 10 teams."; b.disabled = false; return; }
+    await saveSettings({ teams: [...myTeams(), { league: $("tmLeague").value, id: b.dataset.tmAdd, name: b.dataset.name }] });
+    openTeams();
+  } catch (x) { toast(x.message); b.disabled = false; }
+});
+// Leaving an editor rebuilds whichever tab is showing.
+const rebuildViews = () => { if (view === "stocks") renderStocks(); if (view === "sports") renderSports(); };
 
 /* ---------- load ---------- */
 async function load() {

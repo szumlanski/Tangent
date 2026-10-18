@@ -40,7 +40,7 @@ async function yahoo(s, rg) {
   const m = res.meta;
   // chartPreviousClose is the close before the range starts, so it is only the prior close for 1d.
   const prev = rg.days === 1 ? m.chartPreviousClose : m.regularMarketPreviousClose ?? m.previousClose ?? points.at(-2)[1];
-  return { last: m.regularMarketPrice, prev, points, source: "Yahoo" };
+  return { last: m.regularMarketPrice, prev, points, source: "Yahoo", name: m.longName || m.shortName || null, type: m.instrumentType || null, exchange: m.fullExchangeName || m.exchangeName || null };
 }
 
 async function nasdaq(s, rg) {
@@ -107,7 +107,9 @@ export async function onRequestGet({ request, waitUntil }) {
   const url = new URL(request.url);
   const key = (url.searchParams.get("sym") || "").toUpperCase();
   const range = url.searchParams.get("range") || "1d";
-  const s = SYMS[key], rg = RANGES[range];
+  // Built-in symbols have tuned fallbacks; any other ticker (AAPL, BRK-B, BTC-USD) goes to Yahoo, then Nasdaq.
+  const s = SYMS[key] || (/^[A-Z][A-Z0-9.^=-]{0,11}$/.test(key) ? { name: null, yahoo: key, nasdaq: [key.replace(/-/g, "."), "stocks"], etf: true } : null);
+  const rg = RANGES[range];
   if (!s || !rg) return Response.json({ error: "unknown sym or range" }, { status: 400 });
 
   const cache = caches.default;
@@ -117,6 +119,7 @@ export async function onRequestGet({ request, waitUntil }) {
 
   const tries = [() => yahoo(s, rg)];
   if (s.nasdaq) tries.push(() => nasdaq(s, rg));
+  if (s.etf) tries.push(() => nasdaq({ nasdaq: [s.nasdaq[0], "etf"] }, rg));
   if (s.cboe && (rg.days === 1 || !s.proxy)) tries.push(() => cboe(s, rg));
   if (s.proxy) tries.push(() => proxyScaled(s, rg));
   const errors = [];
@@ -124,7 +127,7 @@ export async function onRequestGet({ request, waitUntil }) {
     try {
       const out = await t();
       if (out.points.length < 2) throw new Error(`${out.source} too few points`);
-      const res = Response.json({ sym: key, name: s.name, range, ...out, delayed: true }, {
+      const res = Response.json({ sym: key, range, ...out, name: s.name || out.name || key, delayed: true }, {
         headers: { "cache-control": `public, max-age=${rg.ttl}` },
       });
       waitUntil(cache.put(cacheKey, res.clone()));
@@ -133,5 +136,5 @@ export async function onRequestGet({ request, waitUntil }) {
       errors.push(e.message);
     }
   }
-  return Response.json({ sym: key, name: s.name, range, error: errors.join("; ") }, { status: 502 });
+  return Response.json({ sym: key, name: s.name || key, range, error: errors.join("; ") }, { status: s.name ? 502 : 404 });
 }
