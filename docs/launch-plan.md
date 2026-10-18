@@ -27,7 +27,7 @@ non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
 - [x] 2. More sources for every topic. Vermont first: Manchester Journal, Bennington Banner, Brattleboro Reformer,
       Rutland Herald, Valley News, WCAX, NBC5, Vermont Business Magazine, Addison Independent, Stowe Reporter and others
       that pass the paywall and freshness checks. Then 3 to 6 more per other topic.
-- [ ] 3. Schema: users, sessions, shelves, shelf_sources, topic catalog (suggested topics with vetted sources), per-user
+- [x] 3. Schema: users, sessions, shelves, shelf_sources, topic catalog (suggested topics with vetted sources), per-user
       feedback and settings, rate limits, server-secret RPCs. Migrate Jason's current data to his admin account.
 - [ ] 4. Auth API (Pages Functions): sign up, sign in, sign out, session check, Google OAuth (code flow + PKCE),
       password change, account deletion, rate limiting. Unit tests for cookie signing and input validation.
@@ -43,6 +43,9 @@ non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
 - [ ] 11. Domain: tangentreads.com and www attached and live (done 2026-10-18). Remaining: redirect www and tangent.szumlanski.com to tangentreads.com after accounts ship (the owner key is stored per address).
 
 ## Steps only Jason can do (collected here, given to him one at a time at the end)
+- Approve a purge job for closed accounts. Database changes that DELETE rows are blocked for Claude by a permission
+  check, so closing an account scrubs personal data immediately (email, name, password, Google link) and the leftover
+  rows stay until a purge migration is approved. Sessions, shelves and shelf sources use soft removal by design.
 - Create a Google OAuth client (Google Cloud Console) and paste its ID and secret into Cloudflare.
 - Optional: Resend account for password-reset emails (free 3,000/month).
 
@@ -50,3 +53,4 @@ non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
 - 2026-10-18 item 1: app loads each topic's newest 160 (sports 60) separately. Vermont went from 2 visible stories to 82. Shelves (item 6) will move this server-side per user.
 - 2026-10-18 domain: Jason registered tangentreads.com; attached apex and www to the Pages project with proxied CNAMEs, apex active and serving.
 - 2026-10-18 item 2: +13 Vermont (10 free, plus Manchester Journal, Bennington Banner, Brattleboro Reformer as new 'subscriber' headline-only sources: all their articles are marked paid), +21 across solar, tech, world, SWFL, travel. Fixed a paywall false positive (Piano analytics script on free WCAX pages); news window 3 to 7 days for weekly papers.
+- 2026-10-18 item 3: users, sessions, topics, shelves, shelf sources, rate limits, per-user feedback; 22 server-secret functions (secret hash in tangent_config, secret in Cloudflare env via API). End-to-end tested with a throwaway account (closed afterwards). Owner claims admin and old votes by signing in on a device holding the owner key.
