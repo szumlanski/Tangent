@@ -24,7 +24,7 @@ non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
 
 ## Checklist
 - [x] 1. Feed loads per shelf/topic from the server (no global 400-newest cap; this is why Vermont was empty).
-- [ ] 2. More sources for every topic. Vermont first: Manchester Journal, Bennington Banner, Brattleboro Reformer,
+- [x] 2. More sources for every topic. Vermont first: Manchester Journal, Bennington Banner, Brattleboro Reformer,
       Rutland Herald, Valley News, WCAX, NBC5, Vermont Business Magazine, Addison Independent, Stowe Reporter and others
       that pass the paywall and freshness checks. Then 3 to 6 more per other topic.
 - [ ] 3. Schema: users, sessions, shelves, shelf_sources, topic catalog (suggested topics with vetted sources), per-user
@@ -49,3 +49,4 @@ non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
 ## Log
 - 2026-10-18 item 1: app loads each topic's newest 160 (sports 60) separately. Vermont went from 2 visible stories to 82. Shelves (item 6) will move this server-side per user.
 - 2026-10-18 domain: Jason registered tangentreads.com; attached apex and www to the Pages project with proxied CNAMEs, apex active and serving.
+- 2026-10-18 item 2: +13 Vermont (10 free, plus Manchester Journal, Bennington Banner, Brattleboro Reformer as new 'subscriber' headline-only sources: all their articles are marked paid), +21 across solar, tech, world, SWFL, travel. Fixed a paywall false positive (Piano analytics script on free WCAX pages); news window 3 to 7 days for weekly papers.

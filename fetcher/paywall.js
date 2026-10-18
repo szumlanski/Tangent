@@ -21,6 +21,9 @@ const MARKERS = [
   [/"gnt_pw"|gnt-paywall|data-paywall/i, "gannett"],
 ];
 
+// Phrases a truncated, locked article shows. Plain "subscribe" is too common (newsletters).
+export const LOCK_TEXT = /(subscribe|sign in|log in) to (continue|keep) reading|already a subscriber|for (paid|paying) subscribers|subscribers only|this article is (exclusive|available) to subscribers/i;
+
 export function isBlockedDomain(url) {
   const u = new URL(url);
   const host = u.hostname.replace(/^www\./, "");
@@ -38,6 +41,12 @@ export function detectPaywall(html, { wordCount = 0 } = {}) {
     if (/"isAccessibleForFree"\s*:\s*("false"|false)/i.test(m[1])) return "ld+json not free";
   }
   if (/<meta[^>]+(article:content_tier|content_tier)[^>]+content=["'](locked|metered)["']/i.test(html)) return "content_tier meta";
-  for (const [re, why] of MARKERS) if (re.test(html) && wordCount < 200) return why;
+  // Generic vendor scripts (Piano, Zephr...) also run on free sites for analytics, so they only
+  // count alongside an actual lock message. Platform markers (Gannett, Substack, Medium) are specific.
+  for (const [re, why] of MARKERS) {
+    if (!re.test(html)) continue;
+    const strong = /gannett|substack|medium|premium flag|paywall class/.test(why);
+    if (strong ? wordCount < 200 : wordCount < 200 && LOCK_TEXT.test(html)) return why;
+  }
   return null;
 }

@@ -153,6 +153,8 @@ a { color: inherit; }
 .card.noimg .acts, .card.small .acts { top: auto; bottom: 8px; right: 8px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar) + 14px); z-index: 50; display: flex; align-items: center; gap: 14px; background: var(--label); color: var(--bg); padding: 10px 10px 10px 16px; border-radius: 22px; font-size: 15px; box-shadow: 0 6px 20px var(--shade); max-width: calc(100% - 32px); }
 .toast button { color: var(--accent); font-weight: 700; height: 32px; padding: 0 10px; }
+.lock { display: inline-flex; align-items: center; gap: 3px; color: var(--label-2); font-weight: 600; }
+.lock svg, .notice svg { width: 13px; height: 13px; vertical-align: -1px; }
 .sum, .also { background: var(--card); border-radius: 12px; padding: 12px 16px; margin: 0 0 18px; }
 .sum-h { font-size: 13px; font-weight: 700; color: var(--tint); margin-bottom: 6px; }
 .sum ul { margin: 0; padding-left: 20px; font-size: 16px; line-height: 1.45; }
@@ -396,12 +398,14 @@ function visible() {
 }
 
 /* ---------- cards ---------- */
+const ICON_LOCK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`;
 const ICON_UP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 10v11H3V10zM7 10l4-8a2.5 2.5 0 0 1 3 2.5V9h5.5a2 2 0 0 1 2 2.3l-1.3 8A2 2 0 0 1 18.2 21H7"/></svg>`;
 const ICON_DOWN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M17 14V3h4v11zM17 14l-4 8a2.5 2.5 0 0 1-3-2.5V15H4.5a2 2 0 0 1-2-2.3l1.3-8A2 2 0 0 1 5.8 3H17"/></svg>`;
 function cardHTML(it, size) {
   const hasImg = !!it.image && size !== "small";
   const kind = KIND_LABEL[it.kind] ? `<span class="k">${KIND_LABEL[it.kind]}</span><span>·</span>` : "";
   const many = (it.story_size || 1) > 1 ? `<span>·</span><span class="k">${it.story_size} outlets</span>` : "";
+  const lock = it.locked ? `<span>·</span><span class="lock" title="Subscriber article: opens on the paper's site">${ICON_LOCK} Subscriber</span>` : "";
   const title = (it.story_size || 1) > 1 && it.story_headline ? it.story_headline : it.title;
   const blurb = it.summary_short || it.excerpt;
   const play = it.kind === "youtube" ? `<span class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>${dur(it.duration_s) || "Play"}</span>` : "";
@@ -413,7 +417,7 @@ function cardHTML(it, size) {
     </span>
     ${hasImg ? `<div class="img" style="background-image:url('${esc(it.image).replace(/'/g, "%27")}')">${play}</div>` : ""}
     <div class="txt">
-      <div class="meta">${kind}<b>${esc(it.source_name)}</b><span>·</span><span>${ago(it.newest || it.published_at)}</span>${many}</div>
+      <div class="meta">${kind}<b>${esc(it.source_name)}</b><span>·</span><span>${ago(it.newest || it.published_at)}</span>${many}${lock}</div>
       <h3>${esc(title)}</h3>
       ${blurb && (!hasImg || size === "big" || it.summary_short) ? `<p>${esc(blurb)}</p>` : ""}
     </div>
@@ -659,6 +663,10 @@ async function openReader(id, swap = false) {
   if (location.hash !== "#read" && !swap) history.pushState({ read: id }, "", "#read");
 
   if (it.kind === "youtube") return;
+  if (it.locked) {
+    $("rText").insertAdjacentHTML("beforeend", `<div class="notice">${ICON_LOCK} ${esc(it.source_name)} is a subscriber paper, so Tangent shows only the headline. Tap Original to read it on their site, where your free articles or subscription apply.</div>`);
+    return;
+  }
   try {
     const [row] = await sb(`tangent_articles?id=eq.${id}&select=body_html,extracted`);
     if (row?.extracted && row.body_html) {

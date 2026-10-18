@@ -9,7 +9,7 @@
 - Hides and thumbs up/down live in `tangent_feedback`, reachable only through `tangent_set_feedback` / `tangent_get_feedback` with the owner key. Ranking is learned in the app (no API cost): source, topic, format and headline-word scores, calibrated so votes shift a story by hours, not days.
 - Approving scout suggestions needs the owner key, opened once per device as `https://tangent.szumlanski.com/#key=...`. Only its SHA-256 is in `tangent_config`.
 - Database: Supabase project EG4 Monitor (`kyplwgcvbfzyfhiyspsr`). It is a live customer database for another app. Only ever touch objects prefixed `tangent_`. Add schema changes as new files in `supabase/migrations/`.
-- Paywalled articles must never show. Detection is per article in `fetcher/paywall.js` and `fetcher/extract.js`; the `tangent_articles` RLS policy also hides `paywalled = true` rows.
+- Paywalled articles must never show. Exception by design: sources with `access = 'subscriber'` (papers the reader chose to follow, like the Manchester Journal) store only headline, teaser and photo (`locked = true`) and link out; their text is never fetched or shown. Detection is per article in `fetcher/paywall.js` and `fetcher/extract.js`; the `tangent_articles` RLS policy also hides `paywalled = true` rows.
 - After changing anything in `app/`, bump `CACHE` in `app/sw.js` (tangent-vN) so installed copies refresh.
 - Icons: edit `design/icon.svg` and `design/fav.svg`, then re-render the PNGs. If an icon changes, give the PNGs new file names, because `app/_headers` lets browsers cache PNGs for a week.
 - Before pushing, render with Playwright at 390px (light and dark) and 1280px, read the screenshots, and confirm zero console errors and no horizontal scroll.

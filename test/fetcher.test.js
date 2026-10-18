@@ -32,7 +32,9 @@ test("ld+json isAccessibleForFree false is locked", () => {
 
 test("vendor script on a full article is not locked", () => {
   assert.equal(detectPaywall(`<script src="https://cdn.tinypass.com/x.js"></script>`, { wordCount: 800 }), null);
-  assert.equal(detectPaywall(`<script src="https://cdn.tinypass.com/x.js"></script>`, { wordCount: 90 }), "piano");
+  assert.equal(detectPaywall(`<script src="https://cdn.tinypass.com/x.js"></script><p>Subscribe to continue reading</p>`, { wordCount: 60 }), "piano");
+  assert.equal(detectPaywall(`<script src="https://cdn.tinypass.com/x.js"></script>`, { wordCount: 49 }), null, "free video caption on a Piano site");
+  assert.equal(detectPaywall(`<script src="https://cdn.tinypass.com/x.js"></script>`, { wordCount: 150 }), null, "short free brief on a Piano site");
 });
 
 test("free article extracts full text and is not locked", () => {

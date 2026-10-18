@@ -2,7 +2,7 @@
 import { parseHTML } from "linkedom";
 import { Readability } from "@mozilla/readability";
 import { get } from "./http.js";
-import { detectPaywall } from "./paywall.js";
+import { detectPaywall, LOCK_TEXT } from "./paywall.js";
 
 const meta = (doc, ...names) => {
   for (const n of names) {
@@ -22,9 +22,6 @@ export function plain(s) {
   if (!s) return s;
   return untag(decode(untag(decode(s)))).replace(/\s+/g, " ").trim();
 }
-
-// Phrases a truncated, locked article ends with. Plain "subscribe" is too common.
-const LOCK_TEXT = /(subscribe|sign in|log in) to (continue|keep) reading|already a subscriber|for (paid|paying) subscribers|subscribers only|this article is (exclusive|available) to subscribers/i;
 
 export function extractFromHtml(html, url) {
   const { document } = parseHTML(html);

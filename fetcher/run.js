@@ -12,11 +12,12 @@ import { stories } from "./stories.js";
 
 const STRATEGIES = { rss, gnews, sitemap, scrape };
 // News goes stale fast; videos and blogs post less often.
-const MAX_AGE = { news: 3 * 864e5, blog: 14 * 864e5, youtube: 14 * 864e5, podcast: 14 * 864e5 };
+// Weekly papers post less often, so news looks back a week; ranking favors fresh stories anyway.
+const MAX_AGE = { news: 7 * 864e5, blog: 14 * 864e5, youtube: 14 * 864e5, podcast: 14 * 864e5 };
 const MAX_NEW_PER_SOURCE = 15;
 const ROW_DEFAULTS = {
   origin_url: null, excerpt: null, image: null, author: null, body_html: null, word_count: null,
-  extracted: false, paywalled: false, paywall_reason: null, video_id: null,
+  extracted: false, paywalled: false, paywall_reason: null, video_id: null, locked: false,
 };
 
 // Try each strategy in order; the first that returns items wins.
@@ -86,7 +87,15 @@ async function processSourceInner(source) {
         continue;
       }
       if (it.gnews) row.url = await decode(it.gnews);
-      if (isBlockedDomain(row.url)) continue;
+      if (isBlockedDomain(row.url) && source.access !== "subscriber") continue;
+      // Subscriber sources: headline, teaser and photo from the feed only, marked locked, link out.
+      if (source.access === "subscriber") {
+        row.title = plain(row.title);
+        row.excerpt = plain(row.excerpt)?.slice(0, 400) || null;
+        row.locked = true;
+        if (row.title && row.title.length >= 8) rows.push(row);
+        continue;
+      }
 
       const ex = await extract(row.url).catch(e => ({ error: e.message }));
       if (ex.paywall) {

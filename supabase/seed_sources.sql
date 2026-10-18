@@ -54,3 +54,42 @@ insert into public.tangent_sources (name, kind, topic, site_url, feed_url, strat
 ('Florida Gators','youtube','sports','https://www.youtube.com/@FloridaGators','https://www.youtube.com/feeds/videos.xml?channel_id=UC97IlakvONh8RBUODRuk4mA','{rss}'),
 ('MLS','youtube','sports','https://www.youtube.com/@MLS','https://www.youtube.com/feeds/videos.xml?channel_id=UCSZbXT5TLLW_i-5W8FZpFsg','{rss}')
 on conflict do nothing;
+
+-- 2026-10-18: more sources per topic (each vetted: feed found, posting weekly, free, readable).
+-- Subscriber papers (access = 'subscriber') show headlines only and link out.
+insert into public.tangent_sources (name, kind, topic, site_url, feed_url, strategies, selectors, access) values
+('Valley News','news','vermont','https://www.vnews.com','https://vnews.com/feed/','{rss,gnews}',null,'free'),
+('WCAX','news','vermont','https://www.wcax.com','https://www.wcax.com/arc/outboundfeeds/rss/?outputType=xml','{rss,gnews}',null,'free'),
+('NBC5 Vermont','news','vermont','https://www.mynbc5.com',null,'{scrape,gnews}','{"list": "a[href^=\"/article/\"]"}','free'),
+('Rutland Herald','news','vermont','https://www.rutlandherald.com',null,'{gnews,sitemap}',null,'free'),
+('Times Argus','news','vermont','https://www.timesargus.com','https://www.timesargus.com/search/?f=rss&t=article&l=50&s=start_time&sd=desc','{rss,gnews}',null,'free'),
+('Addison Independent','news','vermont','https://www.addisonindependent.com','https://www.addisonindependent.com/feed/','{rss,gnews}',null,'free'),
+('Mountain Times','news','vermont','https://mountaintimes.info','https://mountaintimes.info/feed/','{rss,gnews}',null,'free'),
+('Vermont Daily Chronicle','news','vermont','https://vermontdailychronicle.com','https://vermontdailychronicle.com/feed/','{rss}',null,'free'),
+('Vermont Cynic','news','vermont','https://vtcynic.com','https://vtcynic.com/feed/','{rss}',null,'free'),
+('The Charlotte News','news','vermont','https://www.charlottenewsvt.org','https://www.charlottenewsvt.org/feed/','{rss}',null,'free'),
+('Manchester Journal','news','vermont','https://www.manchesterjournal.com','https://manchesterjournal.com/local-news/?lab_viewport=rss','{rss}',null,'subscriber'),
+('Bennington Banner','news','vermont','https://www.benningtonbanner.com','https://benningtonbanner.com/local-news/?lab_viewport=rss','{rss}',null,'subscriber'),
+('Brattleboro Reformer','news','vermont','https://www.reformer.com','https://reformer.com/local-news/?lab_viewport=rss','{rss}',null,'subscriber'),
+('ESS News','news','solar','https://www.ess-news.com','https://www.ess-news.com/feed/','{rss,gnews}',null,'free'),
+('Solar Builder','news','solar','https://solarbuildermag.com','https://solarbuildermag.com/feed','{rss,gnews}',null,'free'),
+('TechCrunch','news','tech','https://techcrunch.com','https://techcrunch.com/feed/','{rss,gnews}',null,'free'),
+('Engadget','news','tech','https://www.engadget.com','https://www.engadget.com/category/news/feed/','{rss,gnews}',null,'free'),
+('The Register','news','tech','https://www.theregister.com','https://www.theregister.com/feed','{rss,gnews}',null,'free'),
+('9to5Google','news','tech','https://9to5google.com','https://9to5google.com/feed/','{rss}',null,'free'),
+('9to5Mac','news','tech','https://9to5mac.com','https://9to5mac.com/feed/','{rss}',null,'free'),
+('VentureBeat','news','tech','https://venturebeat.com',null,'{gnews,sitemap}',null,'free'),
+('Al Jazeera','news','world','https://www.aljazeera.com','https://www.aljazeera.com/xml/rss/all.xml','{rss,gnews}',null,'free'),
+('The Guardian','news','world','https://www.theguardian.com/world','https://www.theguardian.com/world/rss','{rss}',null,'free'),
+('DW','news','world','https://www.dw.com/en','https://rss.dw.com/rdf/rss-en-all','{rss}',null,'free'),
+('CBS News','news','world','https://www.cbsnews.com','https://www.cbsnews.com/latest/rss/main','{rss,gnews}',null,'free'),
+('ABC News','news','world','https://abcnews.go.com','https://abcnews.go.com/abcnews/topstories','{rss,gnews}',null,'free'),
+('Cape Coral Breeze','news','swfl','https://www.capecoralbreeze.com','https://www.capecoralbreeze.com/feed','{rss,gnews}',null,'free'),
+('WGCU','news','swfl','https://www.wgcu.org',null,'{gnews,sitemap}',null,'free'),
+('Gulfshore Business','news','swfl','https://www.gulfshorebusiness.com',null,'{gnews,sitemap}',null,'free'),
+('Sanibel-Captiva Islander','news','swfl','https://www.captivasanibel.com','https://www.captivasanibel.com/feed','{rss,gnews}',null,'free'),
+('Conde Nast Traveler','news','travel','https://www.cntraveler.com','https://www.cntraveler.com/feed/rss','{rss,gnews}',null,'free'),
+('Matador Network','news','travel','https://matadornetwork.com','https://matadornetwork.com/feed','{rss,gnews}',null,'free'),
+('Travel Off Path','news','travel','https://www.traveloffpath.com','https://www.traveloffpath.com/feed/','{rss}',null,'free'),
+('The Points Guy','news','travel','https://thepointsguy.com','https://thepointsguy.com/feed','{rss,gnews}',null,'free')
+on conflict do nothing;
