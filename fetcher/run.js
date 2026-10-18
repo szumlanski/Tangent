@@ -11,6 +11,7 @@ import { collectTrends } from "./trends.js";
 import { stories } from "./stories.js";
 import { alerts } from "./alerts.js";
 import { vetPending, refreshSuggestions } from "./vet.js";
+import { retention } from "./retention.js";
 
 const STRATEGIES = { rss, gnews, gsearch, sitemap, scrape };
 const RUN_START = Date.now();
@@ -180,6 +181,9 @@ await alerts().catch(e => console.warn("alerts:", e.message));
 
 // Suggested sources for shelves that follow a phrase change slowly; refresh them hourly.
 if (new Date().getUTCMinutes() < 15) await refreshSuggestions().catch(e => console.warn("suggestions:", e.message));
+
+// Daily trim of old article text, stories and logs (keeps the shared free database small).
+await retention().catch(e => console.warn("retention:", e.message));
 
 // One line per run in the event log, for the admin dashboard.
 const failed = results.filter(r => r.error);

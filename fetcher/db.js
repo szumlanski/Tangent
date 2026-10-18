@@ -131,3 +131,14 @@ export async function saveShelfSuggestions(searchSourceId, outlets) {
 }
 
 export const logEvent = (kind, detail) => DRY ? null : rest("tangent_events_log", { method: "POST", body: [{ kind, detail }], prefer: "return=minimal" });
+
+// ---- retention (service key; see retention.js) ----
+const count = async (path, opts) => {
+  const r = await fetch(`${URL_}/rest/v1/${path}`, { ...opts, headers: { apikey: KEY, authorization: `Bearer ${KEY}`, "content-type": "application/json", prefer: "return=minimal,count=exact" } });
+  if (!r.ok) throw new Error(`supabase ${opts.method} ${path.split("?")[0]}: ${r.status} ${await r.text()}`);
+  return +(r.headers.get("content-range") || "").split("/")[1] || 0;
+};
+export const trimBodies = before => count(`tangent_articles?fetched_at=lt.${before}&body_html=not.is.null`, { method: "PATCH", body: JSON.stringify({ body_html: null }) });
+export const expiredArticles = async n => (await rest(`tangent_expired_articles?select=id&limit=${n}`)).map(r => r.id);
+export const deleteArticles = ids => count(`tangent_articles?id=in.(${ids.join(",")})`, { method: "DELETE" });
+export const trimOlder = (table, col, before) => count(`${table}?${col}=lt.${before}`, { method: "DELETE" });

@@ -152,12 +152,6 @@ const routes = {
     return json({ ok: true }, 200, { "set-cookie": signOutCookies() });
   },
 
-  // The original owner moves their pre-account votes and admin rights onto this account.
-  async "POST me/claim"({ env, request, user }) {
-    const b = await body(request);
-    const ok = typeof b.key === "string" && await rpc(env, "tangent_claim_owner", { p_user: user.id, p_owner_key: b.key });
-    return json({ ok: !!ok });
-  },
 
   // ---- personas ----
   async "POST personas/save"({ env, request, user, log }) {
@@ -349,6 +343,11 @@ export async function onRequest(context) {
     const { sid, user } = await currentUser(env, request);
     who = user;
     if (!PUBLIC.has(key) && !user) return json({ error: "Please sign in." }, 401, { "set-cookie": signOutCookies() });
+    // A ceiling on writes per account, so a stuck script or a stolen session cannot flood the database.
+    if (user && request.method === "POST" && !(await allow(env, "w:" + user.id, 300, 3600))) {
+      log("rate_limited", { route: key });
+      return json({ error: "Too many changes in the last hour. Try again later." }, 429);
+    }
     // The device's chosen persona; the database falls back to the first one if it is missing or not theirs.
     const persona = /^\d{1,12}$/.test(request.headers.get("x-persona") || "") ? +request.headers.get("x-persona") : null;
     return await handler({ env, request, sid, user, persona, log });

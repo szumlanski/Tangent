@@ -8,7 +8,7 @@
 // Signed out and not looking around as a guest: show the welcome page instead of the app.
 (function () {
   try {
-    if (/(^|;\s*)tg_(in|guest)=1/.test(document.cookie) || localStorage.getItem("ownerKey") || /key=/.test(location.hash)) return;
+    if (/(^|;\s*)tg_(in|guest)=1/.test(document.cookie)) return;
   } catch (e) { return; }
   location.replace("/welcome");
 })();
@@ -814,7 +814,8 @@ async function openReader(id, swap = false) {
       const first = $("rText").querySelector("img");
       if (first && it.image && first.src.split("?")[0] === it.image.split("?")[0]) first.closest("figure")?.remove() ?? first.remove();
     } else {
-      $("rText").insertAdjacentHTML("beforeend", `<div class="notice">Full text was not available for this one. Tap Original to read it on ${esc(it.source_name)}.</div>`);
+      // Full text is kept for a few days to keep storage small; older stories link to the original.
+      $("rText").insertAdjacentHTML("beforeend", `<div class="notice">${row?.extracted ? `Tangent keeps the full text of stories for 3 days. Tap Original to read this one on ${esc(it.source_name)}.` : `Full text was not available for this one. Tap Original to read it on ${esc(it.source_name)}.`}</div>`);
     }
   } catch {
     if (!$("rText")) return;
@@ -1204,21 +1205,12 @@ async function saveFeedback(it, change) {
     catch (e) { toast(e instanceof TypeError ? "Saved on this device only. No connection to the server." : "Saved on this device only. " + e.message); }
     return;
   }
-  const key = store.get("ownerKey", "");
-  if (!key) return;
-  try {
-    await rpc("tangent_set_feedback", { p_key: key, p_article: it.id, p_vote: change.vote ?? null, p_hidden: change.hidden ?? null });
-  } catch (e) {
-    const offline = e instanceof TypeError; // fetch itself failed: no connection
-    toast(offline ? "Saved on this phone only. No connection to the server." : /bad key/.test(e.message)
-      ? "Saved on this phone only. Open your setup link to sync." : "Saved on this phone only. The server refused it.");
-  }
+  // Without an account, votes and hides stay on this device.
 }
 async function loadFeedback() {
-  const key = store.get("ownerKey", "");
-  if (!signedIn() && !key) return;
+  if (!signedIn()) return;
   try {
-    feedback = signedIn() ? await api("feedback") : await rpc("tangent_get_feedback", { p_key: key });
+    feedback = await api("feedback");
     store.set("feedback", feedback);
     learn();
     if (view === "news") render();
@@ -1270,18 +1262,7 @@ $("rActs").addEventListener("click", e => {
 });
 learn();
 
-/* ---------- source suggestions (owner only) ---------- */
-// The owner key arrives once via #key=... and stays on this device.
-(function takeKey() {
-  const m = location.hash.match(/key=([a-f0-9]{32})/);
-  if (m) { store.set("ownerKey", m[1]); history.replaceState(null, "", location.pathname); }
-})();
-async function rpc(fn, args) {
-  const r = await fetch(SB + "rpc/" + fn, { method: "POST", headers: { apikey: SB_KEY, authorization: "Bearer " + SB_KEY, "content-type": "application/json" }, body: JSON.stringify(args) });
-  if (!r.ok) throw new Error(await r.text());
-  // 204 means saved with nothing to return; reading JSON from it would throw.
-  return r.status === 204 ? null : r.json();
-}
+/* ---------- source suggestions (admins) ---------- */
 async function renderSuggestions() {
   const box = $("suggList");
   if (!box) return;
@@ -1337,9 +1318,6 @@ function setMe(next) {
 async function loadMe() {
   if (!signedIn()) { if (me) setMe(null); return; }
   try { setMe(await api("me")); } catch { return; }
-  // The original owner's device moves its pre-account votes and admin rights onto this account.
-  const key = store.get("ownerKey", "");
-  if (key && !me.user.is_admin) { try { if ((await api("me/claim", { key })).ok) { setMe(await api("me")); loadFeedback(); } } catch {} }
   if (!hasShelves() && !store.get("picked:" + me.persona, false)) openTopics(true);
   // A device that turned on alerts before signing in moves them to this account.
   attachPush();
@@ -1347,7 +1325,7 @@ async function loadMe() {
 function signedOutHere() {
   for (const k of ["me", "feedback", "feed", "persona"]) store.del(k);
   me = null; feedback = []; learn();
-  if (!/(^|;\s*)tg_guest=1/.test(document.cookie) && !store.get("ownerKey", "")) location.replace("/welcome");
+  if (!/(^|;\s*)tg_guest=1/.test(document.cookie)) location.replace("/welcome");
   else { renderAcctBtn(); renderTabs(); load(); }
 }
 // A persona's face: its picture, else its emoji, else its first letter on its color.
@@ -1990,7 +1968,7 @@ async function load() {
   }
 }
 
-if (location.hash && !/key=/.test(location.hash)) history.replaceState(null, "", location.pathname);
+if (location.hash) history.replaceState(null, "", location.pathname);
 renderTabs();
 renderAcctBtn();
 setView(view);
