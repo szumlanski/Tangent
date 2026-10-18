@@ -1,5 +1,8 @@
 name: Fetch news
 
+# GitHub's schedule often starts runs hours late, so each run stays up for about
+# 5 hours 45 minutes and fetches every 15 minutes itself. The schedule only has to start
+# a new run every few hours. Public repo, so the minutes are free.
 on:
   schedule:
     - cron: "*/15 * * * *"
@@ -12,7 +15,7 @@ concurrency:
 jobs:
   fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,7 +24,21 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run fetch
+      - name: Fetch every 15 minutes
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          end=$(( $(date +%s) + 340 * 60 ))
+          while [ "$(date +%s)" -lt "$end" ]; do
+            started=$(date +%s)
+            echo "::group::fetch $(date -u +%H:%M)"
+            # Pick up code pushed since this run started, so a fix does not wait hours.
+            git pull -q --ff-only origin main && npm ci --silent || echo "update skipped"
+            timeout 20m npm run fetch || echo "fetch failed or timed out; trying again next round"
+            echo "::endgroup::"
+            next=$(( started + 900 ))
+            now=$(date +%s)
+            [ "$next" -gt "$end" ] && break
+            [ "$now" -lt "$next" ] && sleep $(( next - now ))
+          done
