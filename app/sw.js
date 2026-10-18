@@ -1,6 +1,6 @@
 // Cache the whole app on install so it opens instantly and works offline.
 // Page files are served from cache first and refreshed in the background.
-const CACHE = "tangent-v31";
+const CACHE = "tangent-v32";
 const ASSETS = [
   "./",
   "help",
@@ -60,7 +60,8 @@ self.addEventListener("notificationclick", e => {
   const url = new URL(e.notification.data?.url || "/", self.location.origin).href;
   e.waitUntil(clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
     const open = list.find(c => new URL(c.url).origin === self.location.origin);
-    if (open) { open.postMessage({ open: url }); return open.focus(); }
+    // Stories open inside the running app; other pages (like /admin) get their own window.
+    if (open && /#a=\d+$/.test(url)) { open.postMessage({ open: url }); return open.focus(); }
     return clients.openWindow(url);
   }));
 });

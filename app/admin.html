@@ -198,7 +198,7 @@ $("view").addEventListener("click", async e => {
   } catch (x) { alert(x.message); b.disabled = false; }
 });
 
-api("me").then(m => { $("who").textContent = `Signed in as ${m.user.email}`; if (!m.user.is_admin) throw new Error("Admins only."); show("overview"); })
+api("me").then(m => { $("who").textContent = `Signed in as ${m.user.email}`; if (!m.user.is_admin) throw new Error("Admins only."); show(location.hash === "#users" ? "users" : "overview"); })
   .catch(e => { if (e.message !== "signed out") $("view").innerHTML = `<p class="msg">This page is for Tangent admins. <a href="/">Back to Tangent</a></p>`; });
 </script>
 </body>

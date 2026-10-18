@@ -12,6 +12,7 @@ import { stories } from "./stories.js";
 import { alerts } from "./alerts.js";
 import { vetPending, refreshSuggestions } from "./vet.js";
 import { retention } from "./retention.js";
+import { signups } from "./signups.js";
 
 const STRATEGIES = { rss, gnews, gsearch, sitemap, scrape };
 const RUN_START = Date.now();
@@ -178,6 +179,9 @@ await stories().catch(e => console.warn("stories:", e.message));
 
 // Push alerts for what just arrived (local matching, no AI).
 await alerts().catch(e => console.warn("alerts:", e.message));
+
+// Tell admins about new sign-ups.
+await signups().catch(e => console.warn("signups:", e.message));
 
 // Suggested sources for shelves that follow a phrase change slowly; refresh them hourly.
 if (new Date().getUTCMinutes() < 15) await refreshSuggestions().catch(e => console.warn("suggestions:", e.message));

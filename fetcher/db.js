@@ -110,6 +110,9 @@ export const guestSubs = async () => DRY ? [] : rest("tangent_guest_subs?disable
 export const markGuestSub = (id, patch) => rest(`tangent_guest_subs?id=eq.${id}`, { method: "PATCH", body: patch, prefer: "return=minimal" });
 export const recentGuestSent = (ids, since) => ids.length ? rest(`tangent_guest_sent?sub_id=in.${inList(ids)}&sent_at=gt.${encodeURIComponent(since)}&select=sub_id,key,sent_at`) : [];
 export const recordGuestSent = row => rest("tangent_guest_sent?on_conflict=sub_id,key", { method: "POST", body: [row], prefer: "resolution=ignore-duplicates,return=minimal" });
+// New accounts since a time, and the push devices of admins (for sign-up notices).
+export const newUsers = since => rest(`tangent_users?created_at=gt.${encodeURIComponent(since)}&deleted_at=is.null&select=email,name,google_sub,created_at&order=created_at.asc`);
+export const adminPushSubs = async () => DRY ? [] : rest("tangent_push_subs?disabled_at=is.null&select=id,endpoint,p256dh,auth,tangent_users!inner(is_admin)&tangent_users.is_admin=is.true");
 export const markSub = (id, patch) => rest(`tangent_push_subs?id=eq.${id}`, { method: "PATCH", body: patch, prefer: "return=minimal" });
 export const recordSent = row => rest("tangent_alert_sent?on_conflict=user_id,key", { method: "POST", body: [row], prefer: "resolution=ignore-duplicates,return=minimal" });
 
