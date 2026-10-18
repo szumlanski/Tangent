@@ -1,0 +1,72 @@
+/* Public pages (welcome, help, privacy, terms). The app itself stays in index.html. */
+:root {
+  --bg: #f4f1ec; --paper: #fbfaf7; --card: #ffffff; --label: #16181b; --label-2: #5c5f66;
+  --sep: rgba(22, 24, 27, 0.14); --rule: #16181b; --tint: #c8401a; --accent: #ff6a3d; --btn-ink: #ffffff;
+  --f-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --f-head: ui-serif, "New York", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0c0d0f; --paper: #121417; --card: #1a1c20; --label: #f2f1ee; --label-2: #a3a6ad; --sep: rgba(255,255,255,0.12); --rule: #f2f1ee; --tint: #ff8a63; --btn-ink: #16181b; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--label); font: 400 17px/1.5 var(--f-ui); -webkit-font-smoothing: antialiased; }
+a { color: var(--tint); }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--tint); outline-offset: 2px; border-radius: 6px; }
+img { max-width: 100%; display: block; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+@media (min-width: 700px) { .wrap { padding: 0 32px; } }
+
+/* Masthead */
+.mast { border-bottom: 1px solid var(--rule); background: var(--bg); position: sticky; top: 0; z-index: 5; padding-top: env(safe-area-inset-top, 0px); }
+.mast .wrap { display: flex; align-items: center; justify-content: space-between; height: 56px; }
+.logo { font: 700 28px/1 var(--f-head); letter-spacing: -0.02em; color: var(--label); text-decoration: none; display: inline-flex; align-items: baseline; gap: 2px; min-height: 44px; align-items: center; }
+.logo i { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); display: inline-block; margin-top: 10px; }
+.mast nav { display: flex; gap: 4px; align-items: center; }
+.mast nav a { min-height: 44px; display: inline-flex; align-items: center; padding: 0 10px; color: var(--label); text-decoration: none; font-weight: 600; font-size: 16px; }
+.mast nav a.hide-sm { display: none; }
+@media (min-width: 700px) { .mast nav a.hide-sm { display: inline-flex; } }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 50px; padding: 0 22px; border-radius: 12px; font-weight: 600; font-size: 17px; text-decoration: none; border: 1.5px solid var(--label); color: var(--label); background: transparent; }
+.btn.primary { background: var(--label); color: var(--bg); }
+.btn.primary:hover { background: var(--tint); border-color: var(--tint); color: var(--btn-ink); }
+.btn:disabled { opacity: 0.6; cursor: default; }
+
+/* Type */
+h1, h2, h3 { font-family: var(--f-head); letter-spacing: -0.015em; margin: 0; }
+.kicker { font-size: 14px; font-weight: 700; color: var(--tint); letter-spacing: 0.02em; margin: 0 0 10px; }
+.lede { font-size: 19px; color: var(--label-2); margin: 16px 0 0; max-width: 34em; }
+.muted { color: var(--label-2); }
+.small { font-size: 15px; }
+section.band { padding: 56px 0; border-top: 1px solid var(--sep); }
+section.band > .wrap > h2 { font-size: 30px; margin-bottom: 8px; }
+@media (min-width: 900px) { section.band { padding: 80px 0; } section.band > .wrap > h2 { font-size: 40px; } }
+
+/* FAQ */
+.faq { margin-top: 20px; border-top: 1px solid var(--rule); }
+.faq details { border-bottom: 1px solid var(--sep); }
+.faq summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 56px; padding: 12px 0; font: 600 19px/1.3 var(--f-head); }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font: 400 26px/1 var(--f-ui); color: var(--tint); flex: none; }
+.faq details[open] summary::after { content: "\2212"; }
+.faq .a { padding: 0 0 18px; color: var(--label-2); max-width: 44em; }
+.faq .a p { margin: 0 0 10px; }
+
+/* Long-form pages (help, privacy, terms) */
+.doc { max-width: 760px; padding-top: 32px; padding-bottom: 64px; }
+.doc h1 { font-size: 40px; line-height: 1.1; }
+.doc h2 { font-size: 26px; margin: 36px 0 8px; }
+.doc p, .doc li { color: var(--label); }
+.doc .updated { color: var(--label-2); font-size: 15px; margin-top: 8px; }
+
+footer.site { border-top: 1px solid var(--rule); padding: 28px 0 calc(28px + env(safe-area-inset-bottom, 0px)); font-size: 15px; color: var(--label-2); }
+footer.site .wrap { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; justify-content: space-between; }
+footer.site nav { display: flex; flex-wrap: wrap; gap: 0 4px; }
+footer.site a { color: var(--label); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; padding: 0 8px; }
+footer.site a:first-child { padding-left: 0; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }

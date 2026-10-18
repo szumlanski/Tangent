@@ -76,7 +76,7 @@ async function processSourceInner(source) {
         origin_url: it.gnews || null,
         title: it.title,
         excerpt: it.excerpt || null,
-        image: it.image || null,
+        image: /^https?:\/\//.test(it.image || "") ? it.image : null,
         author: it.author || null,
         published_at: it.published ? new Date(it.published).toISOString() : started,
       };

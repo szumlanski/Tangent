@@ -1,7 +1,7 @@
 // /api/v1/* : accounts, sign-in, shelves, feedback. All personal data goes through here.
 // Content (articles, sources) stays public and is read by the app directly from the database.
 import {
-  rpc, json, sign, unsign, readCookie, cookieHeader, clearCookie, COOKIE,
+  rpc, json, sign, unsign, readCookie, cookieHeader, signOutCookies,
   checkSignup, startSession, currentUser, sameOrigin, clientIp, EMAIL_RE,
 } from "../../../lib/server.js";
 
@@ -48,7 +48,12 @@ const routes = {
   async "POST auth/logout"({ env, request, sid }) {
     const b = await body(request);
     if (sid) await rpc(env, "tangent_session_end", { p_sid: sid, p_all: !!b.all });
-    return json({ ok: true }, 200, { "set-cookie": clearCookie(COOKIE) });
+    return json({ ok: true }, 200, { "set-cookie": signOutCookies() });
+  },
+
+  // What the sign-in sheet can offer.
+  async "GET auth/config"({ env }) {
+    return json({ google: !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) });
   },
 
   // ---- Google ----
@@ -61,13 +66,13 @@ const routes = {
       client_id: env.GOOGLE_CLIENT_ID, redirect_uri: `${url.origin}/api/v1/auth/google/callback`, response_type: "code",
       scope: "openid email profile", state, code_challenge: await sha256url(verifier), code_challenge_method: "S256", prompt: "select_account",
     });
-    const cookie = cookieHeader(OAUTH_COOKIE, await sign(JSON.stringify({ state, verifier, back: back.startsWith("/") ? back : "/" }), env.SESSION_SECRET), { maxAge: 600, path: "/api/v1/auth/google" });
+    const cookie = cookieHeader(OAUTH_COOKIE, await sign(JSON.stringify({ state, verifier, back: /^\/(?![/\\])/.test(back) ? back : "/" }), env.SESSION_SECRET), { maxAge: 600, path: "/api/v1/auth/google" });
     return new Response(null, { status: 302, headers: { location: `${GOOGLE_AUTH}?${q}`, "set-cookie": cookie } });
   },
 
   async "GET auth/google/callback"({ env, request }) {
     const url = new URL(request.url);
-    const fail = msg => new Response(null, { status: 302, headers: { location: "/?signin_error=" + encodeURIComponent(msg) } });
+    const fail = msg => new Response(null, { status: 302, headers: { location: "/welcome?signin_error=" + encodeURIComponent(msg) } });
     const raw = readCookie(request, OAUTH_COOKIE);
     const saved = raw && await unsign(raw, env.SESSION_SECRET);
     if (!saved) return fail("Sign-in expired. Please try again.");
@@ -91,7 +96,7 @@ const routes = {
     if (!claims.email_verified) return fail("Your Google email is not verified.");
     const user = await rpc(env, "tangent_google", { p_sub: claims.sub, p_email: claims.email, p_name: claims.name || "" });
     const headers = new Headers({ location: back });
-    headers.append("set-cookie", await startSession(env, request, user));
+    for (const c of await startSession(env, request, user)) headers.append("set-cookie", c);
     headers.append("set-cookie", `${OAUTH_COOKIE}=; Path=/api/v1/auth/google; Max-Age=0; HttpOnly; Secure; SameSite=Lax`);
     return new Response(null, { status: 302, headers });
   },
@@ -120,7 +125,7 @@ const routes = {
     const b = await body(request);
     if (b.confirm !== "DELETE") return json({ error: "Type DELETE to confirm." }, 400);
     await rpc(env, "tangent_close_account", { p_user: user.id });
-    return json({ ok: true }, 200, { "set-cookie": clearCookie(COOKIE) });
+    return json({ ok: true }, 200, { "set-cookie": signOutCookies() });
   },
 
   // The original owner moves their pre-account votes and admin rights onto this account.
@@ -166,7 +171,7 @@ const routes = {
   },
 };
 
-const PUBLIC = new Set(["POST auth/signup", "POST auth/login", "POST auth/logout", "GET auth/google", "GET auth/google/callback"]);
+const PUBLIC = new Set(["POST auth/signup", "POST auth/login", "POST auth/logout", "GET auth/config", "GET auth/google", "GET auth/google/callback"]);
 
 export async function onRequest(context) {
   const { request, env, params } = context;
@@ -177,7 +182,7 @@ export async function onRequest(context) {
   if (request.method === "POST" && !sameOrigin(request)) return json({ error: "Cross-site request refused." }, 403);
   try {
     const { sid, user } = await currentUser(env, request);
-    if (!PUBLIC.has(key) && !user) return json({ error: "Please sign in." }, 401, { "set-cookie": clearCookie(COOKIE) });
+    if (!PUBLIC.has(key) && !user) return json({ error: "Please sign in." }, 401, { "set-cookie": signOutCookies() });
     return await handler({ env, request, sid, user });
   } catch (e) {
     const known = KNOWN[e.message];

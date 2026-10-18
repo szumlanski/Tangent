@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tangent: the news you follow, without the paywalls</title>
+<meta name="description" content="A free news reader for the outlets, blogs and YouTube channels you choose. One card per story, short summaries, and no paywalled articles.">
+<link rel="canonical" href="https://tangentreads.com/welcome">
+<meta property="og:title" content="Tangent: the news you follow, without the paywalls">
+<meta property="og:description" content="A free news reader for the outlets, blogs and YouTube channels you choose. One card per story, and no paywalled articles.">
+<meta property="og:image" content="https://tangentreads.com/shot-desktop.jpg">
+<meta name="theme-color" content="#f4f1ec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0d0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="app-icon-180.png">
+<link rel="stylesheet" href="site.css">
+<style>
+/* Hero: a front page. Headline column plus the phone. */
+.hero { padding: 36px 0 48px; }
+.hero .wrap { display: grid; gap: 40px; align-items: center; }
+.dateline { display: flex; justify-content: space-between; gap: 12px; border-bottom: 3px double var(--rule); padding-bottom: 8px; margin-bottom: 24px; font-size: 14px; color: var(--label-2); }
+.hero h1 { font-size: 44px; line-height: 1.02; font-weight: 700; }
+.hero h1 em { font-style: italic; color: var(--tint); }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.cta .btn { flex: 1 1 200px; }
+.fine { margin-top: 14px; font-size: 15px; color: var(--label-2); }
+.phone { justify-self: center; width: min(300px, 78vw); aspect-ratio: 390 / 844; border-radius: 44px; padding: 10px; background: #16181b; box-shadow: 0 30px 60px -20px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.06) inset; }
+.phone img { width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 34px; }
+@media (min-width: 900px) {
+  .hero { padding: 56px 0 72px; }
+  .hero .wrap { grid-template-columns: 1.25fr 0.75fr; gap: 64px; }
+  .hero h1 { font-size: 68px; }
+  .phone { width: 320px; }
+}
+
+/* How it works: three numbered columns, newspaper rules between. */
+.steps { display: grid; gap: 0; margin-top: 24px; counter-reset: s; }
+.steps li { list-style: none; padding: 22px 0; border-top: 1px solid var(--sep); counter-increment: s; }
+.steps li::before { content: counter(s); font: 700 44px/1 var(--f-head); color: var(--tint); display: block; margin-bottom: 10px; }
+.steps h3 { font-size: 22px; margin-bottom: 6px; }
+.steps p { margin: 0; color: var(--label-2); }
+@media (min-width: 800px) {
+  .steps { grid-template-columns: repeat(3, 1fr); }
+  .steps li { border-top: 0; border-left: 1px solid var(--sep); padding: 4px 28px; }
+  .steps li:first-child { border-left: 0; padding-left: 0; }
+}
+ol.steps { padding: 0; }
+
+/* Features: two columns of short items. */
+.feats { display: grid; gap: 28px 40px; margin-top: 28px; }
+.feat h3 { font-size: 21px; margin-bottom: 6px; display: flex; gap: 10px; align-items: baseline; }
+.feat h3::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; transform: translateY(-3px); }
+.feat p { margin: 0; color: var(--label-2); }
+@media (min-width: 700px) { .feats { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 1000px) { .feats { grid-template-columns: 1fr 1fr 1fr; } }
+
+.shot { margin-top: 28px; border-radius: 14px; overflow: hidden; border: 1px solid var(--sep); box-shadow: 0 24px 50px -24px rgba(0,0,0,0.3); }
+.closing { text-align: center; }
+.closing h2 { font-size: 34px; }
+.closing .cta { justify-content: center; max-width: 460px; margin-left: auto; margin-right: auto; }
+
+/* Sign-in sheet */
+dialog.auth { border: 0; padding: 0; background: var(--paper); color: var(--label); width: min(440px, 100%); max-height: 100dvh; border-radius: 18px; box-shadow: 0 30px 80px rgba(0,0,0,0.35); }
+dialog.auth::backdrop { background: rgba(0,0,0,0.45); }
+@media (max-width: 599px) {
+  dialog.auth { margin: auto 0 0; max-width: 100%; width: 100%; border-radius: 18px 18px 0 0; }
+}
+.auth .in { padding: 8px 20px calc(24px + env(safe-area-inset-bottom, 0px)); }
+.auth .top { display: flex; justify-content: space-between; align-items: center; min-height: 52px; }
+.auth .grab { width: 36px; height: 5px; border-radius: 3px; background: var(--sep); margin: 8px auto 0; }
+.auth h2 { font-size: 26px; }
+.auth .x { min-width: 44px; min-height: 44px; border: 0; background: none; color: var(--tint); font-weight: 600; font-size: 17px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--sep); border-radius: 10px; padding: 2px; margin: 8px 0 18px; }
+.seg button { min-height: 40px; border: 0; border-radius: 8px; background: none; font-weight: 600; font-size: 15px; color: var(--label-2); }
+.seg button[aria-pressed="true"] { background: var(--card); color: var(--label); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+.auth label { display: block; font-size: 15px; font-weight: 600; margin: 14px 0 6px; }
+.auth input { width: 100%; min-height: 48px; border-radius: 10px; border: 1px solid var(--sep); background: var(--card); color: var(--label); font: 400 17px var(--f-ui); padding: 0 14px; }
+.auth input:focus { outline: 2px solid var(--tint); outline-offset: 0; border-color: transparent; }
+.auth .hint { font-size: 14px; color: var(--label-2); margin-top: 6px; }
+.auth .err { color: var(--tint); font-size: 15px; font-weight: 600; margin: 14px 0 0; min-height: 1px; }
+.auth .btn { width: 100%; margin-top: 18px; }
+.google { background: var(--card) !important; color: var(--label) !important; border: 1px solid var(--sep) !important; }
+.google svg { width: 20px; height: 20px; }
+.or { display: flex; align-items: center; gap: 12px; color: var(--label-2); font-size: 14px; margin: 18px 0 2px; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--sep); }
+.auth .legal { font-size: 14px; color: var(--label-2); margin-top: 14px; }
+</style>
+</head>
+<body>
+<header class="mast">
+  <div class="wrap">
+    <a class="logo" href="/welcome" aria-label="Tangent home">Tangent<i></i></a>
+    <nav aria-label="Site">
+      <a class="hide-sm" href="#how">How it works</a>
+      <a class="hide-sm" href="#faq">FAQ</a>
+      <a href="#signin" data-auth="signin">Sign in</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <div class="dateline"><span id="today">Free, independent, no ads</span><span>Updated every 15 minutes</span></div>
+        <h1>Every story you follow. <em>None of the paywalls.</em></h1>
+        <p class="lede">Tangent gathers the outlets, blogs and YouTube channels you choose into one calm magazine. When five outlets cover the same story, you get one card. Locked articles never show up.</p>
+        <div class="cta">
+          <a class="btn primary" href="#signup" data-auth="signup">Create a free account</a>
+          <a class="btn" href="/" id="guest">Look around first</a>
+        </div>
+        <p class="fine">Free. No ads. Sign in with Google or an email and password.</p>
+      </div>
+      <div class="phone"><img src="shot-phone.jpg" width="390" height="844" alt="Tangent on a phone: a full-page story card with a photo, headline, outlet and thumbs up, thumbs down and hide buttons"></div>
+    </div>
+  </section>
+
+  <section class="band" id="how">
+    <div class="wrap">
+      <p class="kicker">How it works</p>
+      <h2>Set it up once. Read it every day.</h2>
+      <ol class="steps">
+        <li><h3>Pick your shelves</h3><p>Start with ready-made topics like World, Tech and AI, Solar and energy, Travel or a local region. Each one comes stocked with vetted sources.</p></li>
+        <li><h3>Add anything you read</h3><p>Paste a news site, a personal blog or a YouTube channel. Tangent checks it can read it for free and adds it to your shelf.</p></li>
+        <li><h3>Flip, read, teach it</h3><p>Swipe through pages on your phone or scan the grid on a computer. Thumbs up or down, and Tangent leans your feed your way.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <p class="kicker">Why Tangent</p>
+      <h2>A news reader that respects your time.</h2>
+      <div class="feats">
+        <div class="feat"><h3>No paywalls</h3><p>Every article is checked when it is fetched. If it is locked, it is left out, so you never tap a headline and hit a subscribe wall.</p></div>
+        <div class="feat"><h3>One card per story</h3><p>The same news from several outlets is grouped together, with the other coverage listed underneath. No more six copies of one headline.</p></div>
+        <div class="feat"><h3>Summaries when it matters</h3><p>Big stories covered by several outlets get a short summary at the top, so you can decide whether to read the whole thing.</p></div>
+        <div class="feat"><h3>Learns gently</h3><p>Your votes shift a story by hours, not days. Your feed bends toward what you like without hiding the news you need.</p></div>
+        <div class="feat"><h3>Blogs and video too</h3><p>Personal blogs, newsletters and YouTube channels sit next to the newspapers. Videos play right in the reader.</p></div>
+        <div class="feat"><h3>Markets and scores</h3><p>Delayed quotes and charts for the indexes and funds you watch, plus scores, schedules and rankings for your teams.</p></div>
+      </div>
+      <div class="shot"><img src="shot-desktop.jpg" width="1280" height="800" loading="lazy" alt="Tangent on a computer: a magazine grid of story cards under topic tabs"></div>
+    </div>
+  </section>
+
+  <section class="band" id="faq">
+    <div class="wrap">
+      <p class="kicker">Questions</p>
+      <h2>Frequently asked</h2>
+      <div class="faq">
+        <details><summary>Is Tangent really free?</summary><div class="a"><p>Yes. There are no ads, no subscriptions and no paid tier. Tangent runs on free services and only uses AI where it saves you real reading time.</p></div></details>
+        <details><summary>How do you keep paywalled articles out?</summary><div class="a"><p>Each article is checked when it is fetched: the publisher's own free or paid markup, known paywall systems, and whether the full text is actually readable. Locked articles are dropped. A few local papers that lock most stories can be followed as headline-only cards marked Subscriber, which open on the paper's site.</p></div></details>
+        <details><summary>Can I add any website or YouTube channel?</summary><div class="a"><p>Yes. Paste a site address, a feed or a YouTube channel into a shelf. If Tangent can read it without a paywall, it joins your shelf and its stories show up within about 15 minutes.</p></div></details>
+        <details><summary>Do I need an account?</summary><div class="a"><p>No. You can look around without one. An account saves your shelves, sources, votes and hidden stories, and keeps them in sync between your phone and computer.</p></div></details>
+        <details><summary>Does it work on my phone?</summary><div class="a"><p>Yes. On iPhone, open tangentreads.com in Safari, tap Share, then Add to Home Screen. On Android, open it in Chrome and tap Install app. It opens full screen like any other app.</p></div></details>
+        <details><summary>What do you do with my data?</summary><div class="a"><p>We keep your email, name, shelves and votes so the app works, and nothing else. No ads, no trackers, no selling data. You can delete your account at any time. Read the <a href="/privacy">privacy policy</a>.</p></div></details>
+      </div>
+      <p class="small muted" style="margin-top:18px">More answers in <a href="/help">Help</a>.</p>
+    </div>
+  </section>
+
+  <section class="band closing">
+    <div class="wrap">
+      <h2>Your front page, your way.</h2>
+      <p class="lede" style="margin-left:auto;margin-right:auto">It takes about a minute to set up.</p>
+      <div class="cta">
+        <a class="btn primary" href="#signup" data-auth="signup">Create a free account</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <nav aria-label="Footer"><a href="/help">Help</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="#signin" data-auth="signin">Sign in</a></nav>
+    <span>&copy; <span id="yr">2026</span> Tangent</span>
+  </div>
+</footer>
+
+<dialog class="auth" id="auth" aria-labelledby="authTitle">
+  <div class="grab" aria-hidden="true"></div>
+  <div class="in">
+    <div class="top"><h2 id="authTitle">Create your account</h2><button class="x" type="button" id="authClose">Cancel</button></div>
+    <div class="seg" role="group" aria-label="Account">
+      <button type="button" data-mode="signup" aria-pressed="true">New here</button>
+      <button type="button" data-mode="signin" aria-pressed="false">I have an account</button>
+    </div>
+    <div id="googleBox" hidden>
+      <a class="btn google" id="googleBtn" href="/api/v1/auth/google?next=/">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+        <span>Continue with Google</span>
+      </a>
+      <div class="or">or use email</div>
+    </div>
+    <form id="authForm" novalidate>
+      <div id="nameRow"><label for="fName">Your first name <span class="muted">(optional)</span></label><input id="fName" name="name" autocomplete="given-name" maxlength="60"></div>
+      <label for="fEmail">Email</label>
+      <input id="fEmail" name="email" type="email" autocomplete="email" inputmode="email" required>
+      <label for="fPass">Password</label>
+      <input id="fPass" name="password" type="password" autocomplete="new-password" minlength="10" required>
+      <div class="hint" id="passHint">At least 10 characters.</div>
+      <p class="err" id="authErr" role="alert"></p>
+      <button class="btn primary" id="authGo" type="submit">Create account</button>
+    </form>
+    <p class="legal" id="legal">By creating an account you agree to the <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</p>
+  </div>
+</dialog>
+
+<script>
+const $ = id => document.getElementById(id);
+$("yr").textContent = new Date().getFullYear();
+$("today").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+
+// "Look around first": remember the choice so the app opens straight to the feed next time.
+$("guest").addEventListener("click", () => {
+  document.cookie = "tg_guest=1; Path=/; Max-Age=31536000; Secure; SameSite=Lax";
+});
+
+let mode = "signup";
+function setMode(m) {
+  mode = m;
+  const up = m === "signup";
+  for (const b of document.querySelectorAll(".seg button")) b.setAttribute("aria-pressed", String(b.dataset.mode === m));
+  $("authTitle").textContent = up ? "Create your account" : "Welcome back";
+  $("nameRow").hidden = !up;
+  $("passHint").hidden = !up;
+  $("legal").hidden = !up;
+  $("fPass").autocomplete = up ? "new-password" : "current-password";
+  $("authGo").textContent = up ? "Create account" : "Sign in";
+  $("authErr").textContent = "";
+}
+function openAuth(m) {
+  setMode(m);
+  const d = $("auth");
+  if (!d.open) d.showModal();
+  setTimeout(() => $("fEmail").focus(), 50);
+}
+document.addEventListener("click", e => {
+  const a = e.target.closest("[data-auth]");
+  if (!a) return;
+  e.preventDefault();
+  openAuth(a.dataset.auth);
+});
+document.querySelector(".seg").addEventListener("click", e => { const b = e.target.closest("button"); if (b) setMode(b.dataset.mode); });
+$("authClose").addEventListener("click", () => $("auth").close());
+// Tap outside the sheet to close it.
+$("auth").addEventListener("click", e => { if (e.target === $("auth")) $("auth").close(); });
+
+$("authForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const email = $("fEmail").value.trim(), password = $("fPass").value, name = $("fName").value.trim();
+  const err = $("authErr");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { err.textContent = "Enter a valid email address."; return; }
+  if (mode === "signup" && password.length < 10) { err.textContent = "Use a password of at least 10 characters."; return; }
+  if (!password) { err.textContent = "Enter your password."; return; }
+  err.textContent = "";
+  $("authGo").disabled = true;
+  try {
+    const r = await fetch("/api/v1/auth/" + (mode === "signup" ? "signup" : "login"), {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify(mode === "signup" ? { email, password, name } : { email, password }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "Something went wrong. Please try again.");
+    // New accounts go straight to picking shelves.
+    location.href = mode === "signup" ? "/#welcome" : "/";
+  } catch (x) {
+    err.textContent = x instanceof TypeError ? "No connection. Check your internet and try again." : x.message;
+    $("authGo").disabled = false;
+  }
+});
+
+// Google appears only once it is set up on the server.
+fetch("/api/v1/auth/config").then(r => r.json()).then(c => { $("googleBox").hidden = !c.google; }).catch(() => {});
+
+// Arrivals: #signin / #signup open the sheet; a failed Google sign-in comes back with a message.
+const q = new URLSearchParams(location.search);
+if (q.get("signin_error")) { openAuth("signin"); $("authErr").textContent = q.get("signin_error"); history.replaceState(null, "", "/welcome"); }
+else if (location.hash === "#signin" || location.hash === "#signup") openAuth(location.hash.slice(1));
+</script>
+</body>
+</html>

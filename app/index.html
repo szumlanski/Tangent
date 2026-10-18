@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Tangent</title>
+<script>
+// Signed out and not looking around as a guest: show the welcome page instead of the app.
+(function () {
+  try {
+    if (/(^|;\s*)tg_(in|guest)=1/.test(document.cookie) || localStorage.getItem("ownerKey") || /key=/.test(location.hash)) return;
+  } catch (e) { return; }
+  location.replace("/welcome");
+})();
+</script>
 <meta name="description" content="Your news, no paywalls, one card per story">
 <meta name="theme-color" content="#121417">
 <meta name="mobile-web-app-capable" content="yes">
@@ -268,6 +277,39 @@ details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; m
   .grid .card.trend { grid-column: span 2; grid-row: span 2; }
 }
 
+/* Account menu, shelves picker, help */
+.avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--label); color: var(--bg); display: grid; place-items: center; font: 700 15px/1 var(--f-ui); }
+.menu li { padding: 0; display: block; }
+.menu li > button, .menu li > a { display: flex; width: 100%; min-height: 50px; align-items: center; padding: 0 16px; text-align: left; text-decoration: none; font-size: 17px; }
+.menu li > :is(button, a)::after { content: "\203A"; margin-left: auto; padding-left: 12px; color: var(--label-2); font-size: 24px; line-height: 1; }
+.menu .danger { color: var(--down); }
+.rbody .lead { color: var(--label-2); margin: 0 0 20px; }
+.bigbtn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 50px; border-radius: 12px; font-weight: 600; font-size: 17px; text-decoration: none; background: var(--card); color: var(--label); border: 1px solid var(--sep); margin: 0 0 10px; }
+.bigbtn.primary { background: var(--label); color: var(--bg); border-color: var(--label); }
+.bigbtn:disabled { opacity: .55; }
+.pick { display: grid; gap: 10px; margin: 0 0 18px; }
+.pick button { display: grid; grid-template-columns: 1fr 28px; gap: 2px 12px; align-items: center; text-align: left; background: var(--card); border-radius: 14px; padding: 14px 16px; border: 2px solid transparent; }
+.pick button b { font-size: 17px; }
+.pick button span { grid-column: 1; font-size: 15px; color: var(--label-2); }
+.pick button i { grid-row: 1 / span 2; grid-column: 2; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--sep); display: grid; place-items: center; }
+.pick button[aria-pressed="true"] { border-color: var(--tint); }
+.pick button[aria-pressed="true"] i { background: var(--tint); border-color: var(--tint); }
+.pick button[aria-pressed="true"] i::after { content: ""; width: 10px; height: 6px; border: solid #fff; border-width: 0 0 2.5px 2.5px; transform: translate(0, -1px) rotate(-45deg); }
+.pick button:disabled { opacity: .6; }
+.field { display: block; margin: 0 0 14px; }
+.field span { display: block; font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+.field input { width: 100%; min-height: 48px; border-radius: 10px; border: 1px solid var(--sep); background: var(--card); color: var(--label); font: 400 17px var(--f-ui); padding: 0 14px; }
+.ferr { color: var(--down); font-weight: 600; font-size: 15px; min-height: 1px; margin: 0 0 12px; }
+.faq h2 { font: 700 22px/1.2 var(--f-head); margin: 28px 0 6px; }
+.faq details { border-bottom: 0.5px solid var(--sep); }
+.faq summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 14px; min-height: 52px; padding: 10px 0; font-weight: 600; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; font-size: 24px; line-height: 1; color: var(--tint); flex: none; }
+.faq details[open] summary::after { content: "\2212"; }
+.faq .a { color: var(--label-2); padding: 0 0 14px; }
+.faq .a p { margin: 0 0 8px; }
+.faq a { color: var(--tint); }
+
 @media (prefers-reduced-motion: reduce) { .reader { transition: none; } .card { transition: none; } }
 </style>
 </head>
@@ -282,9 +324,7 @@ details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; m
         <button data-kind="youtube" aria-pressed="false">Video</button>
         <button data-kind="blog" aria-pressed="false">Blogs</button>
       </div>
-      <button class="icon-btn" id="sourcesBtn" aria-label="Sources">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.5" fill="currentColor"/></svg>
-      </button>
+      <button class="icon-btn" id="acctBtn" aria-label="Account, shelves and help"></button>
     </div>
   </div>
   <nav class="tabs" id="tabs" role="tablist"></nav>
@@ -332,6 +372,7 @@ const $ = id => document.getElementById(id);
 const store = {
   get(k, f) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : f; } catch { return f; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} },
 };
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -376,7 +417,8 @@ function diversify(items) {
 // Some feeds hand over a blank headline, which ends up as just the outlet name ("- Lonely Planet").
 const junkTitle = i => i.title.replace(new RegExp(i.source_name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), "").replace(/[^a-z0-9]/gi, "").length < 8;
 function visible() {
-  const list = state.items.filter(i => i.topic !== "sports" && !isHidden(i) && !junkTitle(i) && (!state.topic || i.topic === state.topic) && (!state.kind || i.kind === state.kind));
+  const tab = curTab();
+  const list = state.items.filter(i => inTab(i, tab) && !isHidden(i) && !junkTitle(i) && (!state.kind || i.kind === state.kind));
   // One card per story. Articles not grouped yet fall back to a headline match.
   const groups = new Map();
   for (const i of list) {
@@ -404,7 +446,7 @@ const ICON_HIDE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const ICON_UP = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 10v11H3V10zM7 10l4-8a2.5 2.5 0 0 1 3 2.5V9h5.5a2 2 0 0 1 2 2.3l-1.3 8A2 2 0 0 1 18.2 21H7"/></svg>`;
 const ICON_DOWN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M17 14V3h4v11zM17 14l-4 8a2.5 2.5 0 0 1-3-2.5V15H4.5a2 2 0 0 1-2-2.3l1.3-8A2 2 0 0 1 5.8 3H17"/></svg>`;
 function cardHTML(it, size) {
-  const hasImg = !!it.image && size !== "small";
+  const hasImg = /^https?:\/\//.test(it.image || "") && size !== "small";
   const kind = KIND_LABEL[it.kind] ? `<span class="k">${KIND_LABEL[it.kind]}</span><span>·</span>` : "";
   const many = (it.story_size || 1) > 1 ? `<span>·</span><span class="k">${it.story_size} outlets</span>` : "";
   const lock = it.locked ? `<span>·</span><span class="lock" title="Subscriber article: opens on the paper's site">${ICON_LOCK} Subscriber</span>` : "";
@@ -605,8 +647,23 @@ function render() {
   renderGrid(list);
 }
 
+// Tabs are the starter topics for guests, and your own shelves once you have some.
+const hasShelves = () => !!me?.shelves?.length;
+function tabs() {
+  if (!hasShelves()) return TOPICS.map(([key, label]) => ({ key, label, topic: key }));
+  return [{ key: "", label: "For you" }, ...me.shelves.map(s => ({ key: "s" + s.id, label: s.name, topic: s.topic, ids: new Set(s.sources.map(x => x.id)) }))];
+}
+const curTab = () => tabs().find(t => t.key === state.topic) || tabs()[0];
+let allIds = new Set();
+function inTab(i, t) {
+  if (t.ids) return t.ids.has(i.source_id);
+  if (!t.key) return hasShelves() ? allIds.has(i.source_id) : i.topic !== "sports";
+  return i.topic === t.key;
+}
 function renderTabs() {
-  $("tabs").innerHTML = TOPICS.map(([k, label]) => `<button class="tab" role="tab" data-topic="${k}" aria-selected="${k === state.topic}">${label}</button>`).join("");
+  allIds = new Set((me?.shelves || []).flatMap(s => s.sources.map(x => x.id)));
+  if (!tabs().some(t => t.key === state.topic)) { state.topic = ""; store.set("topic", ""); }
+  $("tabs").innerHTML = tabs().map(t => `<button class="tab" role="tab" data-topic="${t.key}" aria-selected="${t.key === state.topic}">${esc(t.label)}</button>`).join("");
 }
 $("tabs").addEventListener("click", e => {
   const b = e.target.closest(".tab");
@@ -652,7 +709,7 @@ async function openReader(id, swap = false) {
   const meta = `<div class="meta">${KIND_LABEL[it.kind] ? `<span class="k">${KIND_LABEL[it.kind]}</span><span>·</span>` : ""}<b>${esc(it.source_name)}</b><span>·</span><span>${ago(it.published_at)} ago</span>${it.word_count ? `<span>·</span><span>${Math.max(1, Math.round(it.word_count / 230))} min read</span>` : ""}</div>`;
   const top = it.kind === "youtube" && it.video_id
     ? `<iframe class="video" src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(it.video_id)}?rel=0&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen title="${esc(it.title)}"></iframe>`
-    : it.image ? `<img class="hero" src="${esc(it.image)}" alt="">` : "";
+    : /^https?:\/\//.test(it.image || "") ? `<img class="hero" src="${esc(it.image)}" alt="">` : "";
   const others = state.items.filter(x => it.cluster_id && x.cluster_id === it.cluster_id && x.id !== it.id);
   const sum = Array.isArray(it.bullets) && it.bullets.length
     ? `<section class="sum"><div class="sum-h">Summary${it.story_size > 1 ? ` · from ${it.story_size} outlets` : ""}</div><ul>${it.bullets.map(b => `<li>${esc(b)}</li>`).join("")}</ul></section>` : "";
@@ -698,21 +755,35 @@ $("rBody").addEventListener("click", e => {
   const b = e.target.closest("[data-open]");
   if (b) openReader(+b.dataset.open, true);
 });
-addEventListener("popstate", () => { closeReader(true); if (location.hash !== "#sources") closeSources(true); });
-addEventListener("keydown", e => { if (e.key === "Escape") { closeReader(false); closeSources(false); } });
+addEventListener("popstate", () => { closeReader(true); if (location.hash !== "#" + panel) closePanel(true); });
+addEventListener("keydown", e => { if (e.key === "Escape") { closeReader(false); closePanel(false); } });
 
-/* ---------- sources sheet (health) ---------- */
-let sourcesOpen = false;
-async function openSources() {
-  const r = $("reader"), body = $("rBody");
-  sourcesOpen = true;
+/* ---------- panels: account, shelves, help, sources ---------- */
+// Panels reuse the reader sheet. Moving between panels swaps the content in place.
+let panel = "";
+function openPanel(name, html) {
+  const r = $("reader"), was = panel;
+  panel = name;
   $("rActs").hidden = true;
-  body.innerHTML = `<h1>Sources</h1><div id="suggList"></div><p class="meta">Green fetched on the last run. Red failed; the reason is underneath.</p><div id="srcList">Loading…</div>`;
-  renderSuggestions();
-  r.hidden = false; $("rScroll").scrollTop = 0;
+  $("rBody").innerHTML = html;
+  $("rScroll").scrollTop = 0;
+  if (was) return history.replaceState({ panel: name }, "", "#" + name);
+  r.hidden = false;
   requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add("open")));
   document.body.style.overflow = "hidden";
-  history.pushState({ sources: 1 }, "", "#sources");
+  history.pushState({ panel: name }, "", "#" + name);
+}
+function closePanel(fromHistory) {
+  if (!panel) return;
+  panel = "";
+  $("rActs").hidden = false;
+  closeReader(true);
+  if (!fromHistory && location.hash.length > 1) history.back();
+}
+
+async function openSources() {
+  openPanel("sources", `<h1>Sources</h1><div id="suggList"></div><p class="meta">Green fetched on the last run. Red failed; the reason is underneath.</p><div id="srcList">Loading…</div>`);
+  renderSuggestions();
   try {
     const rows = await sb("tangent_sources?select=name,kind,topic,site_url,enabled,disabled_reason,last_ok_at,last_run_at,last_strategy,last_count,last_error&order=topic,name");
     const by = {};
@@ -729,19 +800,15 @@ async function openSources() {
     $("srcList").textContent = "Could not load sources.";
   }
 }
-function closeSources(fromHistory) {
-  if (!sourcesOpen) return;
-  sourcesOpen = false;
-  $("rActs").hidden = false;
-  closeReader(true);
-  if (!fromHistory && location.hash === "#sources") history.back();
-}
-$("sourcesBtn").addEventListener("click", openSources);
-$("rClose").addEventListener("click", () => closeSources(false));
+$("rClose").addEventListener("click", () => closePanel(false));
 
 /* ---------- local trends ---------- */
 let trends = store.get("trends", []);
-const showTrends = () => trends.length > 0 && (state.topic === "" || state.topic === "swfl") && !state.kind;
+// Local trends are SW Florida's, so they ride along with that topic (and "For you" when it includes it).
+const showTrends = () => {
+  const t = curTab();
+  return trends.length > 0 && !state.kind && (t.topic === "swfl" || (!t.key && (!hasShelves() || me.shelves.some(s => s.topic === "swfl"))));
+};
 function trendHTML() {
   // Six of each, one line apiece, fits a phone page without scrolling.
   const g = trends.filter(t => t.source === "gtrends").slice(0, 6);
@@ -985,9 +1052,10 @@ $("sportsView").addEventListener("click", e => {
 });
 
 /* ---------- feedback: hide, thumbs up/down, learned ranking ---------- */
-// Rows mirror tangent_get_feedback. Saved on this device right away, and to the database
-// when the owner key is present, so hides and votes follow you across devices.
+// Rows mirror tangent_get_feedback. Saved on this device right away, and to your account
+// (or, before accounts, the owner key) so hides and votes follow you across devices.
 let feedback = store.get("feedback", []);
+let me = store.get("me", null);
 let prefs = {}, hiddenStories = new Set(), hiddenArticles = new Set(), votes = new Map();
 const STOP = new Set("the and for with from that this into over after about what when where will have has are was were its his her their they you your our new more says said how why who can could would than just also amid".split(" "));
 const fwords = t => [...new Set((t || "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(" ").filter(w => w.length > 3 && !STOP.has(w)))];
@@ -1025,6 +1093,11 @@ async function saveFeedback(it, change) {
   Object.assign(row, change, { at: new Date().toISOString() });
   store.set("feedback", feedback);
   learn();
+  if (signedIn()) {
+    try { await api("feedback", { article: it.id, vote: change.vote ?? null, hidden: change.hidden ?? null }); }
+    catch (e) { toast(e instanceof TypeError ? "Saved on this device only. No connection to the server." : "Saved on this device only. " + e.message); }
+    return;
+  }
   const key = store.get("ownerKey", "");
   if (!key) return;
   try {
@@ -1037,9 +1110,9 @@ async function saveFeedback(it, change) {
 }
 async function loadFeedback() {
   const key = store.get("ownerKey", "");
-  if (!key) return;
+  if (!signedIn() && !key) return;
   try {
-    feedback = await rpc("tangent_get_feedback", { p_key: key });
+    feedback = signedIn() ? await api("feedback") : await rpc("tangent_get_feedback", { p_key: key });
     store.set("feedback", feedback);
     learn();
     if (view === "news") render();
@@ -1131,15 +1204,158 @@ document.addEventListener("click", async e => {
   }
 });
 
+/* ---------- account ---------- */
+// The session cookie is HttpOnly; tg_in is its readable shadow, so the page knows without asking.
+const signedIn = () => /(^|;\s*)tg_in=1/.test(document.cookie);
+async function api(path, body) {
+  const r = await fetch("/api/v1/" + path, body === undefined ? { credentials: "same-origin" }
+    : { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401 && path !== "auth/login") signedOutHere();
+  if (!r.ok) throw new Error(j.error || "Something went wrong. Please try again.");
+  return j;
+}
+const shelfKey = m => JSON.stringify((m?.shelves || []).map(s => [s.id, s.name, s.sources.map(x => x.id)]));
+function setMe(next) {
+  const changed = shelfKey(next) !== shelfKey(me);
+  me = next; store.set("me", me);
+  renderAcctBtn();
+  if (changed) { renderTabs(); if (view === "news") render(); load(); }
+}
+async function loadMe() {
+  if (!signedIn()) { if (me) setMe(null); return; }
+  try { setMe(await api("me")); } catch { return; }
+  // The original owner's device moves its pre-account votes and admin rights onto this account.
+  const key = store.get("ownerKey", "");
+  if (key && !me.user.is_admin) { try { if ((await api("me/claim", { key })).ok) { setMe(await api("me")); loadFeedback(); } } catch {} }
+  if (!hasShelves() && !store.get("picked:" + me.user.id, false)) openTopics(true);
+}
+function signedOutHere() {
+  for (const k of ["me", "feedback", "feed"]) store.del(k);
+  me = null; feedback = []; learn();
+  if (!/(^|;\s*)tg_guest=1/.test(document.cookie) && !store.get("ownerKey", "")) location.replace("/welcome");
+  else { renderAcctBtn(); renderTabs(); load(); }
+}
+function renderAcctBtn() {
+  const u = me?.user;
+  $("acctBtn").innerHTML = u ? `<span class="avatar" aria-hidden="true">${esc((u.name || u.email).trim()[0].toUpperCase())}</span>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>`;
+}
+
+function openAccount() {
+  const u = me?.user;
+  const menu = rows => `<ul class="list menu">${rows.join("")}</ul>`;
+  const go = (k, label, cls = "") => `<li><button data-go="${k}" class="${cls}">${label}</button></li>`;
+  if (!u) return openPanel("account", `<h1>Tangent</h1>
+    <p class="lead">You are looking around without an account. Create one to choose your own shelves and sources, and keep your votes on every device. It is free.</p>
+    <a class="bigbtn primary" href="/welcome#signup">Create a free account</a><a class="bigbtn" href="/welcome#signin">Sign in</a>
+    <div class="sec">More</div>${menu([go("sources", "Sources"), go("help", "Help and FAQ"), `<li><a href="/privacy">Privacy</a></li>`, `<li><a href="/terms">Terms</a></li>`])}`);
+  openPanel("account", `<h1>${esc(u.name || "Your account")}</h1><p class="lead">${esc(u.email)}</p>
+    <div class="sec">Reading</div>${menu([go("topics", "Shelves"), go("sources", "Sources")])}
+    <div class="sec">Help</div>${menu([go("help", "Help and FAQ"), `<li><a href="/privacy">Privacy</a></li>`, `<li><a href="/terms">Terms</a></li>`])}
+    <div class="sec">Account</div>${menu([go("password", u.has_password ? "Change password" : "Set a password"), `<li><button data-act="signout">Sign out</button></li>`,
+      `<li><button data-act="signout-all">Sign out everywhere</button></li>`, go("delete", "Delete account", "danger")])}`);
+}
+$("acctBtn").addEventListener("click", openAccount);
+
+// Shelves from suggested topics. First run (onboarding) and later additions use the same picker.
+async function openTopics(first) {
+  openPanel("shelves", `<h1>${first ? "Pick your shelves" : "Shelves"}</h1>
+    <p class="lead">${first ? "Each shelf is a topic with sources already on it. Pick a few to start; you can change them any time." : "Add a topic as a new shelf. Each one comes with vetted sources."}</p>
+    <div class="pick" id="pick">Loading…</div><p class="ferr" id="pickErr" role="alert"></p>
+    <button class="bigbtn primary" id="pickGo" disabled>${first ? "Start reading" : "Add shelves"}</button>
+    ${first ? `<button class="bigbtn" id="pickSkip">Skip for now</button>` : ""}`);
+  let topics = [];
+  try { topics = await sb("tangent_topics?select=slug,name,blurb,is_default&order=position"); } catch { $("pick").textContent = "Could not load topics. Check your connection."; return; }
+  const have = new Set((me?.shelves || []).map(s => s.topic).filter(Boolean));
+  $("pick").innerHTML = topics.map(t => `<button data-slug="${esc(t.slug)}" aria-pressed="${have.has(t.slug) || (first && t.is_default)}" ${have.has(t.slug) ? "disabled" : ""}>
+    <b>${esc(t.name)}</b><span>${have.has(t.slug) ? "On your shelves" : esc(t.blurb)}</span><i aria-hidden="true"></i></button>`).join("");
+  const sync = () => { const n = $("pick").querySelectorAll('button[aria-pressed="true"]:not(:disabled)').length; $("pickGo").disabled = !n; if (!first) $("pickGo").textContent = n > 1 ? `Add ${n} shelves` : "Add shelf"; };
+  sync();
+  $("pick").addEventListener("click", e => { const b = e.target.closest("button"); if (!b || b.disabled) return; b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")); sync(); });
+  $("pickSkip")?.addEventListener("click", () => { store.set("picked:" + me.user.id, true); closePanel(false); });
+  $("pickGo").addEventListener("click", async () => {
+    const slugs = [...$("pick").querySelectorAll('button[aria-pressed="true"]:not(:disabled)')].map(b => b.dataset.slug);
+    $("pickGo").disabled = true;
+    try {
+      const res = await api("shelves/topics", { topics: slugs });
+      store.set("picked:" + me.user.id, true);
+      setMe({ ...me, ...res });
+      closePanel(false);
+      toast(first ? "You're all set. Change your shelves any time from the account menu." : "Shelves added");
+    } catch (e) { $("pickErr").textContent = e.message; $("pickGo").disabled = false; }
+  });
+}
+
+async function openHelp() {
+  openPanel("help", `<h1>Help and FAQ</h1><div class="faq" id="helpBox">Loading…</div><p class="meta" style="margin-top:20px">Also on the web at <a href="/help" target="_blank" rel="noopener">tangentreads.com/help</a>.</p>`);
+  try {
+    // One source of truth: the public help page (cached for offline by the service worker).
+    const doc = new DOMParser().parseFromString(await (await fetch("help")).text(), "text/html");
+    $("helpBox").innerHTML = doc.getElementById("faq").innerHTML;
+  } catch { $("helpBox").textContent = "Help is not available offline yet. Try again when you are connected."; }
+}
+
+function openPassword() {
+  const has = me.user.has_password;
+  openPanel("password", `<h1>${has ? "Change password" : "Set a password"}</h1>
+    <p class="lead">${has ? "Use at least 10 characters." : "Add a password so you can also sign in with your email."}</p>
+    <form id="pwForm">${has ? `<label class="field"><span>Current password</span><input type="password" id="pwCur" autocomplete="current-password" required></label>` : ""}
+    <label class="field"><span>New password</span><input type="password" id="pwNew" autocomplete="new-password" minlength="10" required></label>
+    <p class="ferr" id="pwErr" role="alert"></p><button class="bigbtn primary">Save password</button></form>`);
+  $("pwForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const nw = $("pwNew").value;
+    if (nw.length < 10) { $("pwErr").textContent = "Use a password of at least 10 characters."; return; }
+    try {
+      await api("me/password", { current: $("pwCur")?.value ?? null, new: nw });
+      setMe({ ...me, user: { ...me.user, has_password: true } });
+      closePanel(false); toast("Password saved");
+    } catch (x) { $("pwErr").textContent = x.message; }
+  });
+}
+
+function openDelete() {
+  openPanel("delete", `<h1>Delete account</h1>
+    <p class="lead">This erases your email, name, password and Google link right away and signs you out on every device. Your shelves and votes go with it. This cannot be undone.</p>
+    <form id="delForm"><label class="field"><span>Type DELETE to confirm</span><input id="delWord" autocomplete="off" autocapitalize="characters" required></label>
+    <p class="ferr" id="delErr" role="alert"></p><button class="bigbtn primary" style="background:var(--down);border-color:var(--down);color:#fff">Delete my account</button></form>`);
+  $("delForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    try { await api("me/delete", { confirm: $("delWord").value.trim() }); leave(); }
+    catch (x) { $("delErr").textContent = x.message; }
+  });
+}
+
+function leave() {
+  for (const k of ["me", "feedback", "feed"]) store.del(k);
+  location.replace("/welcome");
+}
+async function signOut(all) {
+  try { await api("auth/logout", { all }); } catch {}
+  leave();
+}
+
+$("rBody").addEventListener("click", e => {
+  const g = e.target.closest("[data-go]");
+  if (g) return ({ sources: openSources, help: openHelp, topics: () => openTopics(false), password: openPassword, delete: openDelete })[g.dataset.go]();
+  const a = e.target.closest("[data-act]");
+  if (a?.dataset.act === "signout") signOut(false);
+  if (a?.dataset.act === "signout-all") signOut(true);
+});
+
 /* ---------- load ---------- */
 async function load() {
   try {
     // Each topic loads its own newest stories, so a quiet topic (Vermont) is never crowded
     // out by a busy one (sports videos). Bodies are not in the feed, so this stays light.
-    const slugs = [...TOPICS.map(t => t[0]).filter(Boolean), "sports"];
-    const lists = await Promise.all(slugs.map(t =>
-      sb(`tangent_feed?select=*&topic=eq.${encodeURIComponent(t)}&order=published_at.desc&limit=${t === "sports" ? 60 : 160}`)));
-    const rows = lists.flat().sort((a, b) => b.published_at.localeCompare(a.published_at));
+    // With shelves, each shelf loads by its own sources. Sports always loads for the Sports tab.
+    const queries = (hasShelves()
+      ? me.shelves.filter(s => s.sources.length).map(s => `source_id=in.(${s.sources.map(x => x.id).join(",")})&limit=160`)
+      : TOPICS.map(t => t[0]).filter(Boolean).map(t => `topic=eq.${t}&limit=160`)).concat("topic=eq.sports&limit=60");
+    const lists = await Promise.all(queries.map(q => sb(`tangent_feed?select=*&${q}&order=published_at.desc`)));
+    const seen = new Set();
+    const rows = lists.flat().filter(r => !seen.has(r.id) && seen.add(r.id)).sort((a, b) => b.published_at.localeCompare(a.published_at));
     state.items = rows;
     store.set("feed", rows);
     if (view === "news") render();
@@ -1151,10 +1367,12 @@ async function load() {
 
 if (location.hash && !/key=/.test(location.hash)) history.replaceState(null, "", location.pathname);
 renderTabs();
+renderAcctBtn();
 setView(view);
 for (const x of document.querySelectorAll(".kinds button")) x.setAttribute("aria-pressed", String(x.dataset.kind === state.kind));
 render();
 load();
+loadMe();
 loadTrends();
 loadFeedback();
 setInterval(() => { load(); loadTrends(); loadFeedback(); }, 10 * 60e3);

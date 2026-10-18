@@ -1,8 +1,10 @@
 // Cache the whole app on install so it opens instantly and works offline.
 // Page files are served from cache first and refreshed in the background.
-const CACHE = "tangent-v13";
+const CACHE = "tangent-v14";
 const ASSETS = [
   "./",
+  "help",
+  "site.css",
   "manifest.webmanifest",
   "favicon.svg",
   "app-icon-180.png",
@@ -28,8 +30,8 @@ self.addEventListener("fetch", e => {
   // Live data (quotes, scores) always goes to the network.
   if (req.method !== "GET" || u.origin !== location.origin || u.pathname.startsWith("/api/")) return;
   // Cloudflare redirects /index.html to /, and a browser refuses a redirected response
-  // for a page load, so every page load uses the "./" entry.
-  const key = req.mode === "navigate" ? "./" : req;
+  // for a page load, so loads of the app use the "./" entry. Other pages (welcome, help) keep their own.
+  const key = req.mode === "navigate" && (u.pathname === "/" || u.pathname === "/index.html") ? "./" : req;
   e.respondWith(
     caches.open(CACHE).then(async cache => {
       const hit = await cache.match(key, { ignoreSearch: true });

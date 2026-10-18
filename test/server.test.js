@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sign, unsign, checkSignup, readCookie, cookieHeader, sameOrigin } from "../lib/server.js";
+import { sign, unsign, checkSignup, readCookie, cookieHeader, sameOrigin, json, signOutCookies } from "../lib/server.js";
 
 test("session cookie signature round-trips and rejects tampering", async () => {
   const s = await sign("570253a9-52d9-42f4-94f6-76444ad69918", "k1");
@@ -31,4 +31,12 @@ test("cross-site POSTs are refused", () => {
   assert.ok(sameOrigin(mk("https://tangentreads.com")));
   assert.ok(sameOrigin(mk(null)));
   assert.ok(!sameOrigin(mk("https://evil.example")));
+});
+
+test("json() sends every set-cookie line", () => {
+  const r = json({ ok: true }, 200, { "set-cookie": signOutCookies() });
+  const lines = r.headers.getSetCookie();
+  assert.equal(lines.length, 2);
+  assert.ok(lines[0].startsWith("tg_sid=;") && lines[0].includes("HttpOnly"));
+  assert.ok(lines[1].startsWith("tg_in=;") && !lines[1].includes("HttpOnly"));
 });

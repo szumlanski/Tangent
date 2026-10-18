@@ -31,8 +31,8 @@ non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
       feedback and settings, rate limits, server-secret RPCs. Migrate Jason's current data to his admin account.
 - [x] 4. Auth API (Pages Functions): sign up, sign in, sign out, session check, Google OAuth (code flow + PKCE),
       password change, account deletion, rate limiting. Unit tests for cookie signing and input validation.
-- [ ] 5. App: professional public landing page (hero, how it works, features, screenshots, FAQ, footer with privacy/terms/help), sign-in/sign-up sheet, onboarding (pick suggested topics), signed-in feed per shelf.
-- [ ] 5b. Help: public help page (/help) with full FAQ, and an in-app Help and FAQ section in the account menu.
+- [x] 5. App: professional public landing page (hero, how it works, features, screenshots, FAQ, footer with privacy/terms/help), sign-in/sign-up sheet, onboarding (pick suggested topics), signed-in feed per shelf.
+- [x] 5b. Help: public help page (/help) with full FAQ, and an in-app Help and FAQ section in the account menu.
 - [ ] 6. Shelves editor: add, rename, reorder, delete shelves; add or remove sources per shelf; search the catalog;
       paste any URL or YouTube channel; create a topic shelf from a phrase.
 - [ ] 7. Source requests and discovery: pasted URLs and topic phrases are vetted by the fetcher job (feed found,
@@ -49,6 +49,7 @@ non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
   rows stay until a purge migration is approved. Sessions, shelves and shelf sources use soft removal by design.
 - Create a Google OAuth client (Google Cloud Console) and paste its ID and secret into Cloudflare.
 - Optional: Resend account for password-reset emails (free 3,000/month).
+- Optional: a contact address (for example hello@tangentreads.com via free Cloudflare Email Routing) for the privacy page and publisher removal requests.
 
 ## Log
 - 2026-10-18 item 1: app loads each topic's newest 160 (sports 60) separately. Vermont went from 2 visible stories to 82. Shelves (item 6) will move this server-side per user.
@@ -57,3 +58,4 @@ non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
 - 2026-10-18 item 3: users, sessions, topics, shelves, shelf sources, rate limits, per-user feedback; 22 server-secret functions (secret hash in tangent_config, secret in Cloudflare env via API). End-to-end tested with a throwaway account (closed afterwards). Owner claims admin and old votes by signing in on a device holding the owner key.
 - 2026-10-18 item 4: /api/v1 router (lib/server.js + functions/api/v1/[[path]].js): email sign-up/in/out, Google code flow with PKCE (live once Jason adds GOOGLE_CLIENT_ID/SECRET), sessions as HMAC-signed HttpOnly cookies, rate limits per IP and per email, same-origin check on POSTs, shelves, feedback, settings, password change, delete, owner claim. 4 unit tests; 22-step end-to-end run against the real database passed.
 - 2026-10-18 Jason: hide used an x on cards but a crossed-out eye in the reader; same action, now the eye everywhere.
+- 2026-10-18 items 5 and 5b: /welcome landing (hero, how it works, features, real screenshots with publisher photos swapped for color fields, FAQ, footer), /help full FAQ (also loaded into the in-app Help sheet), /privacy, /terms. App: signed-out visitors go to /welcome (tg_in readable cookie, tg_guest for look-around), account menu replaces the Sources button (shelves picker, sources, help, password, sign out, sign out everywhere, delete), onboarding topic picker, tabs and loading per shelf, votes saved per account, owner key claims admin on sign-in. SW no longer serves the app for other pages. Playwright e2e against the real API and database: sign up, pick shelves, vote, help, sign out everywhere, sign in, delete: all pass, zero unexpected console errors, no sideways scroll at 390 light/dark and 1280.
