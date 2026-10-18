@@ -982,8 +982,10 @@ async function saveFeedback(it, change) {
   if (!key) return;
   try {
     await rpc("tangent_set_feedback", { p_key: key, p_article: it.id, p_vote: change.vote ?? null, p_hidden: change.hidden ?? null });
-  } catch {
-    toast("Saved on this phone only. Could not reach the server.");
+  } catch (e) {
+    const offline = e instanceof TypeError; // fetch itself failed: no connection
+    toast(offline ? "Saved on this phone only. No connection to the server." : /bad key/.test(e.message)
+      ? "Saved on this phone only. Open your setup link to sync." : "Saved on this phone only. The server refused it.");
   }
 }
 async function loadFeedback() {
@@ -1049,7 +1051,8 @@ learn();
 async function rpc(fn, args) {
   const r = await fetch(SB + "rpc/" + fn, { method: "POST", headers: { apikey: SB_KEY, authorization: "Bearer " + SB_KEY, "content-type": "application/json" }, body: JSON.stringify(args) });
   if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  // 204 means saved with nothing to return; reading JSON from it would throw.
+  return r.status === 204 ? null : r.json();
 }
 async function renderSuggestions() {
   const box = $("suggList");
