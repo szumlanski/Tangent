@@ -1202,18 +1202,21 @@ $("sportsView").addEventListener("click", e => {
 // (or, before accounts, the owner key) so hides and votes follow you across devices.
 let feedback = store.get("feedback", []);
 let me = store.get("me", null);
-let prefs = {}, hiddenStories = new Set(), hiddenArticles = new Set(), votes = new Map();
+let prefs = {}, hiddenStories = new Set(), hiddenArticles = new Set(), hiddenRepeats = new Set(), votes = new Map();
+// Rolling posts ("AP Sports SummaryBrief at 10:02 a.m. EDT") come back every half hour under a new link.
+// Their headline minus numbers and times is the same, so hiding one hides the repeats too.
+const repeatKey = t => /\d/.test(t || "") ? t.toLowerCase().replace(/\b(a\.?m|p\.?m|e[ds]t|c[ds]t|m[ds]t|p[ds]t|utc|gmt)\b\.?/g, " ").replace(/[^a-z]+/g, " ").trim() : "";
 const STOP = new Set("the and for with from that this into over after about what when where will have has are was were its his her their they you your our new more says said how why who can could would than just also amid".split(" "));
 const fwords = t => [...new Set((t || "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(" ").filter(w => w.length > 3 && !STOP.has(w)))];
 
 // Each thing you vote on (source, topic, format, headline words) gets a score from -1 to 1,
 // shrunk toward 0 until there are a few votes behind it. Hiding counts as a mild "less".
 function learn() {
-  hiddenStories = new Set(); hiddenArticles = new Set(); votes = new Map();
+  hiddenStories = new Set(); hiddenArticles = new Set(); hiddenRepeats = new Set(); votes = new Map();
   const acc = new Map();
   const add = (k, v) => { const a = acc.get(k) || { s: 0, n: 0 }; a.s += v; a.n += 1; acc.set(k, a); };
   for (const r of feedback) {
-    if (r.hidden) { hiddenArticles.add(r.article_id); if (r.cluster_id) hiddenStories.add(r.cluster_id); }
+    if (r.hidden) { hiddenArticles.add(r.article_id); if (r.cluster_id) hiddenStories.add(r.cluster_id); const k = repeatKey(r.title); if (k.split(" ").length >= 3) hiddenRepeats.add(k); }
     if (r.vote) votes.set(r.article_id, r.vote);
     const v = r.vote || (r.hidden ? -0.25 : 0);
     if (!v) continue;
@@ -1231,7 +1234,7 @@ function prefScore(it) {
   // Source and headline words carry most of it; topic and format only lean.
   return 0.5 * p("s" + it.source_id) + 0.15 * p("t" + it.topic) + 0.1 * p("k" + it.kind) + 0.4 * words;
 }
-const isHidden = it => hiddenArticles.has(it.id) || (it.cluster_id && hiddenStories.has(it.cluster_id));
+const isHidden = it => hiddenArticles.has(it.id) || (it.cluster_id && hiddenStories.has(it.cluster_id)) || (hiddenRepeats.size > 0 && hiddenRepeats.has(repeatKey(it.title)));
 
 async function saveFeedback(it, change) {
   let row = feedback.find(r => r.article_id === it.id);
