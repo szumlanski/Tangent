@@ -28,10 +28,12 @@ export async function signups() {
     try {
       await webpush.sendNotification({ endpoint: d.endpoint, keys: { p256dh: d.p256dh, auth: d.auth } }, JSON.stringify(msg), { TTL: 24 * 3600 });
       ok++;
+      await db.markSub(d.id, { last_ok_at: now });
     } catch (e) {
-      if ([404, 410].includes(e.statusCode)) await db.markSub(d.id, { disabled_at: now, failed_at: now });
+      await db.markSub(d.id, [404, 410].includes(e.statusCode) ? { disabled_at: now, failed_at: now } : { failed_at: now });
     }
   }
   await db.setConfig("signups_at", users.at(-1).created_at);
+  await db.logEvent("signup_push", { users: users.length, devices: devices.length, pushed: ok });
   console.log(`signups: ${users.length} new, pushed to ${ok} admin devices`);
 }
