@@ -1,0 +1,50 @@
+# Tangent public launch: build plan
+
+Goal: Tangent becomes a public app at https://tangentreads.com. Anyone can sign up (Google or email and password),
+pick topics ("shelves"), add any source Tangent can read, search sources, and keep getting new sources found for them.
+Jason's decisions (2026-10-18): data stays in the EG4 Monitor Supabase project (`tangent_` tables only), sign-in is
+built into Tangent on Cloudflare Pages Functions (not Supabase Auth: EG4's auth trigger would make every Tangent user
+an EG4 subscriber), open sign-up, domain tangentreads.com, free services only.
+
+Each loop iteration: take the first unchecked item, build it, test it (unit tests, dry fetch, Playwright at 390px
+light/dark and 1280px, zero console errors), deploy to main, check it off here with one line of notes. Never touch
+non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
+
+## Architecture
+- Accounts: `tangent_users` (email, name, bcrypt password via pgcrypto in Postgres so the Worker's 10 ms CPU limit is
+  not hit, google_sub, is_admin). Sessions: HMAC-signed cookie (HttpOnly, Secure, SameSite=Lax) made by Pages
+  Functions; `tangent_sessions` row per login so sign-out and "sign out everywhere" work.
+- Server trust: Pages Functions call SECURITY DEFINER RPCs with a server secret (only its SHA-256 lives in
+  `tangent_config`; the secret is a Cloudflare Pages env var set by Claude through the API). No service key in Cloudflare.
+- Per-user data: shelves, shelf sources, feedback (votes/hides), settings (teams, tickers). Tables have RLS on and no
+  policies: reachable only through the RPCs.
+- Content stays global: sources and articles are shared; the fetcher fetches every source any shelf uses.
+- Topic shelves: a shelf can carry a search phrase; Tangent adds a "search" source (Google News for that phrase), so a
+  new topic has stories within one fetch run, plus discovery suggests real outlets for it.
+
+## Checklist
+- [ ] 1. Feed loads per shelf/topic from the server (no global 400-newest cap; this is why Vermont was empty).
+- [ ] 2. More sources for every topic. Vermont first: Manchester Journal, Bennington Banner, Brattleboro Reformer,
+      Rutland Herald, Valley News, WCAX, NBC5, Vermont Business Magazine, Addison Independent, Stowe Reporter and others
+      that pass the paywall and freshness checks. Then 3 to 6 more per other topic.
+- [ ] 3. Schema: users, sessions, shelves, shelf_sources, topic catalog (suggested topics with vetted sources), per-user
+      feedback and settings, rate limits, server-secret RPCs. Migrate Jason's current data to his admin account.
+- [ ] 4. Auth API (Pages Functions): sign up, sign in, sign out, session check, Google OAuth (code flow + PKCE),
+      password change, account deletion, rate limiting. Unit tests for cookie signing and input validation.
+- [ ] 5. App: public landing page, sign-in/sign-up sheet, onboarding (pick suggested topics), signed-in feed per shelf.
+- [ ] 6. Shelves editor: add, rename, reorder, delete shelves; add or remove sources per shelf; search the catalog;
+      paste any URL or YouTube channel; create a topic shelf from a phrase.
+- [ ] 7. Source requests and discovery: pasted URLs and topic phrases are vetted by the fetcher job (feed found,
+      fresh, free, readable) and join the catalog; background discovery per shelf topic, suggestions shown per shelf.
+- [ ] 8. Per-user feedback and learned ranking (move from owner key to accounts); per-user sports teams and stock tickers.
+- [ ] 9. Admin: Jason can remove or disable any source, see user and source counts, retire the owner-key link.
+- [ ] 10. Housekeeping for a public app: privacy policy, terms, account deletion, data retention (drop article bodies
+      after 21 days, articles after 60) to stay inside the free database, security review of the new endpoints.
+- [ ] 11. Domain: attach tangentreads.com to the Pages project once Jason buys it; redirects from the old address.
+
+## Steps only Jason can do (collected here, given to him one at a time at the end)
+- Buy tangentreads.com (Cloudflare Registrar in the szumlanski.com account, so DNS lands there).
+- Create a Google OAuth client (Google Cloud Console) and paste its ID and secret into Cloudflare.
+- Optional: Resend account for password-reset emails (free 3,000/month).
+
+## Log
