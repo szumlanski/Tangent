@@ -22,7 +22,9 @@ export async function findFeed(site) {
     try { const direct = parseFeed(r.text); if (direct.length) return { feed_url: r.url, items: direct, name: feedTitle(r.text), site: r.url }; } catch {}
     const m = [...r.text.matchAll(/<link[^>]+type=["']application\/(rss|atom)\+xml["'][^>]*>/gi)]
       .map(x => x[0].match(/href=["']([^"']+)["']/i)?.[1]).filter(Boolean);
-    const name = r.text.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)/i)?.[1]
+    // Match the closing quote that opened the value, so "Tom's Guide" keeps its apostrophe.
+    const og = r.text.match(/<meta[^>]+property=["']og:site_name["'][^>]+content=(?:"([^"]+)"|'([^']+)')/i);
+    const name = (og && (og[1] || og[2]))
       || r.text.match(/<title[^>]*>([^<]{2,80})<\/title>/i)?.[1]?.split(/\s[|:–-]\s/)[0]?.trim();
     for (const href of [...m.map(h => new URL(h, r.url).href), ...["/feed", "/rss", "/feed.xml", "/rss.xml", "/index.xml", "/atom.xml"].map(p => new URL(p, r.url).href)]) {
       try {
@@ -47,7 +49,8 @@ async function vetYouTube(url) {
     const r = await get(url);
     if (!r.ok) return { reject: "Could not open that YouTube page." };
     channel = r.text.match(/"(?:channelId|externalId)":"(UC[\w-]{22})"/)?.[1] || r.text.match(/channel\/(UC[\w-]{22})/)?.[1];
-    name = r.text.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i)?.[1] || null;
+    const og = r.text.match(/<meta[^>]+property=["']og:title["'][^>]+content=(?:"([^"]+)"|'([^']+)')/i);
+    name = (og && (og[1] || og[2])) || null;
   }
   if (!channel) return { reject: "That is not a YouTube channel." };
   const feed_url = `https://www.youtube.com/feeds/videos.xml?channel_id=${channel}`;
