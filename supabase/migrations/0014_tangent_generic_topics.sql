@@ -1,0 +1,72 @@
+-- New users pick from common news categories. Jason's local and niche topics (SW Florida, Vermont, Solar)
+-- stay in the catalog and on his shelves, but are no longer offered at sign-up.
+alter table public.tangent_topics add column if not exists listed boolean not null default true;
+update public.tangent_topics set listed = false where slug in ('swfl', 'vermont', 'solar');
+
+insert into public.tangent_topics (slug, name, blurb, position, is_default, listed) values
+  ('us',            'U.S. news',      'NBC News, CBS News, ABC News, Axios, PBS NewsHour, NPR',            0, true,  true),
+  ('world',         'World',          'AP, Reuters, BBC, NPR, The Guardian, Al Jazeera and more',         1, true,  true),
+  ('politics',      'Politics',       'Politico, The Hill, NPR, PBS NewsHour, CBS News, Roll Call',       2, false, true),
+  ('business',      'Business',       'CNBC, Fortune, Fast Company, Kiplinger, Quartz, NPR',              3, false, true),
+  ('tech',          'Tech & AI',      'Ars Technica, The Verge, TechCrunch, AI labs, YouTube',            4, true,  true),
+  ('science',       'Science',        'NASA, Quanta, Space.com, Live Science, Phys.org, ScienceDaily',    5, false, true),
+  ('health',        'Health',         'STAT, KFF Health News, NPR Health, Medical Xpress',                6, false, true),
+  ('climate',       'Climate',        'Inside Climate News, Grist, Carbon Brief, Heatmap, Yale E360',     7, false, true),
+  ('sports',        'Sports',         'Yahoo Sports, SI, CBS Sports and highlights from every league',    8, false, true),
+  ('entertainment', 'Entertainment',  'Variety, Deadline, Billboard, Rolling Stone, The A.V. Club',       9, false, true),
+  ('food',          'Food',           'Bon Appetit, Eater, The Kitchn, Budget Bytes',                     10, false, true),
+  ('travel',        'Travel',         'Atlas Obscura, AFAR, Conde Nast Traveler, The Points Guy',         11, false, true)
+on conflict (slug) do update set name = excluded.name, blurb = excluded.blurb, position = excluded.position,
+  is_default = excluded.is_default, listed = excluded.listed;
+update public.tangent_topics set position = 20 + position where slug in ('swfl', 'vermont', 'solar');
+
+insert into public.tangent_sources (name, kind, topic, site_url, feed_url) values
+  ('NBC News', 'news', 'us', 'https://www.nbcnews.com', 'https://feeds.nbcnews.com/nbcnews/public/news'),
+  ('CBS News U.S.', 'news', 'us', 'https://www.cbsnews.com/us', 'https://www.cbsnews.com/latest/rss/us'),
+  ('ABC News U.S.', 'news', 'us', 'https://abcnews.go.com/US', 'https://abcnews.go.com/abcnews/usheadlines'),
+  ('PBS NewsHour Nation', 'news', 'us', 'https://www.pbs.org/newshour/nation', 'https://www.pbs.org/newshour/feeds/rss/nation'),
+  ('Axios', 'news', 'us', 'https://www.axios.com', 'https://api.axios.com/feed/'),
+  ('NPR National', 'news', 'us', 'https://www.npr.org/sections/national', 'https://feeds.npr.org/1003/rss.xml'),
+  ('Politico', 'news', 'politics', 'https://www.politico.com', 'https://rss.politico.com/politics-news.xml'),
+  ('The Hill', 'news', 'politics', 'https://thehill.com', 'https://thehill.com/homenews/feed/'),
+  ('NPR Politics', 'news', 'politics', 'https://www.npr.org/sections/politics', 'https://feeds.npr.org/1014/rss.xml'),
+  ('PBS NewsHour Politics', 'news', 'politics', 'https://www.pbs.org/newshour/politics', 'https://www.pbs.org/newshour/feeds/rss/politics'),
+  ('CBS News Politics', 'news', 'politics', 'https://www.cbsnews.com/politics', 'https://www.cbsnews.com/latest/rss/politics'),
+  ('Roll Call', 'news', 'politics', 'https://rollcall.com', 'https://rollcall.com/feed/'),
+  ('CNBC', 'news', 'business', 'https://www.cnbc.com', 'https://www.cnbc.com/id/10001147/device/rss/rss.html'),
+  ('NPR Business', 'news', 'business', 'https://www.npr.org/sections/business', 'https://feeds.npr.org/1006/rss.xml'),
+  ('CBS MoneyWatch', 'news', 'business', 'https://www.cbsnews.com/moneywatch', 'https://www.cbsnews.com/latest/rss/moneywatch'),
+  ('Fortune', 'news', 'business', 'https://fortune.com', 'https://fortune.com/feed/'),
+  ('Fast Company', 'news', 'business', 'https://www.fastcompany.com', 'https://www.fastcompany.com/latest/rss'),
+  ('Kiplinger', 'news', 'business', 'https://www.kiplinger.com', 'https://www.kiplinger.com/feeds/all'),
+  ('Quartz', 'news', 'business', 'https://qz.com', 'https://qz.com/rss'),
+  ('NASA', 'news', 'science', 'https://www.nasa.gov', 'https://www.nasa.gov/news-release/feed/'),
+  ('Quanta Magazine', 'news', 'science', 'https://www.quantamagazine.org', 'https://www.quantamagazine.org/feed/'),
+  ('Space.com', 'news', 'science', 'https://www.space.com', 'https://www.space.com/feeds/all'),
+  ('Live Science', 'news', 'science', 'https://www.livescience.com', 'https://www.livescience.com/feeds/all'),
+  ('Phys.org', 'news', 'science', 'https://phys.org', 'https://phys.org/rss-feed/'),
+  ('ScienceDaily', 'news', 'science', 'https://www.sciencedaily.com', 'https://www.sciencedaily.com/rss/top/science.xml'),
+  ('NPR Science', 'news', 'science', 'https://www.npr.org/sections/science', 'https://feeds.npr.org/1007/rss.xml'),
+  ('STAT', 'news', 'health', 'https://www.statnews.com', 'https://www.statnews.com/feed/'),
+  ('KFF Health News', 'news', 'health', 'https://kffhealthnews.org', 'https://kffhealthnews.org/feed/'),
+  ('NPR Health', 'news', 'health', 'https://www.npr.org/sections/health', 'https://feeds.npr.org/1128/rss.xml'),
+  ('Medical Xpress', 'news', 'health', 'https://medicalxpress.com', 'https://medicalxpress.com/rss-feed/'),
+  ('ScienceDaily Health', 'news', 'health', 'https://www.sciencedaily.com/news/health_medicine', 'https://www.sciencedaily.com/rss/top/health.xml'),
+  ('CBS News Health', 'news', 'health', 'https://www.cbsnews.com/health', 'https://www.cbsnews.com/latest/rss/health'),
+  ('Inside Climate News', 'news', 'climate', 'https://insideclimatenews.org', 'https://insideclimatenews.org/feed/'),
+  ('Grist', 'news', 'climate', 'https://grist.org', 'https://grist.org/feed/'),
+  ('Carbon Brief', 'news', 'climate', 'https://www.carbonbrief.org', 'https://www.carbonbrief.org/feed/'),
+  ('Heatmap', 'news', 'climate', 'https://heatmap.news', 'https://heatmap.news/feeds/feed.rss'),
+  ('Yale Environment 360', 'news', 'climate', 'https://e360.yale.edu', 'https://e360.yale.edu/feed.xml'),
+  ('Variety', 'news', 'entertainment', 'https://variety.com', 'https://variety.com/feed/'),
+  ('Deadline', 'news', 'entertainment', 'https://deadline.com', 'https://deadline.com/feed/'),
+  ('Billboard', 'news', 'entertainment', 'https://www.billboard.com', 'https://www.billboard.com/feed/'),
+  ('Rolling Stone', 'news', 'entertainment', 'https://www.rollingstone.com', 'https://www.rollingstone.com/feed/'),
+  ('The A.V. Club', 'news', 'entertainment', 'https://www.avclub.com', 'https://www.avclub.com/rss'),
+  ('Pitchfork', 'news', 'entertainment', 'https://pitchfork.com', 'https://pitchfork.com/feed/feed-news/rss'),
+  ('Bon Appetit', 'news', 'food', 'https://www.bonappetit.com', 'https://www.bonappetit.com/feed/rss'),
+  ('Eater', 'news', 'food', 'https://www.eater.com', 'https://www.eater.com/rss/index.xml'),
+  ('The Kitchn', 'news', 'food', 'https://www.thekitchn.com', 'https://www.thekitchn.com/main.rss'),
+  ('Budget Bytes', 'blog', 'food', 'https://www.budgetbytes.com', 'https://www.budgetbytes.com/feed/'),
+  ('Yahoo Sports', 'news', 'sports', 'https://sports.yahoo.com', 'https://sports.yahoo.com/rss/')
+on conflict (site_url, feed_url) do nothing;

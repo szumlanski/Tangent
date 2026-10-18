@@ -411,10 +411,14 @@ details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; m
 <script>
 const SB = "https://kyplwgcvbfzyfhiyspsr.supabase.co/rest/v1/";
 const SB_KEY = "sb_publishable_LqD81rhJPP9kVN_Rdw22eQ_jhZ3Hc_r"; // public by design; RLS guards the data
+// Tabs for people looking around without an account: common news categories.
 const TOPICS = [
-  ["", "For you"], ["solar", "Solar"], ["tech", "Tech & AI"], ["world", "World"],
-  ["swfl", "SW Florida"], ["travel", "Travel"], ["vermont", "Vermont"],
+  ["", "For you"], ["us", "U.S."], ["world", "World"], ["politics", "Politics"], ["business", "Business"],
+  ["tech", "Tech & AI"], ["science", "Science"], ["health", "Health"], ["climate", "Climate"],
+  ["entertainment", "Entertainment"], ["food", "Food"], ["travel", "Travel"],
 ];
+// Names for every topic in the catalog, including ones only on some people's shelves.
+const TOPIC_NAMES = Object.fromEntries([...TOPICS.slice(1), ["sports", "Sports"], ["solar", "Solar & energy"], ["swfl", "SW Florida"], ["vermont", "Vermont"], ["custom", "Added by readers"]]);
 const KIND_LABEL = { youtube: "Video", blog: "Blog", podcast: "Podcast" };
 
 const $ = id => document.getElementById(id);
@@ -843,7 +847,7 @@ async function openSources() {
     const rows = await sb("tangent_sources?select=name,kind,topic,site_url,enabled,disabled_reason,last_ok_at,last_run_at,last_strategy,last_count,last_error&order=topic,name");
     const by = {};
     for (const s of rows) (by[s.topic] ||= []).push(s);
-    $("srcList").innerHTML = TOPICS.filter(([k]) => by[k]).map(([k, label]) => `<div class="sec">${label}</div><ul class="list">${by[k].map(s => {
+    $("srcList").innerHTML = Object.entries(TOPIC_NAMES).filter(([k]) => by[k]).map(([k, label]) => `<div class="sec">${label}</div><ul class="list">${by[k].map(s => {
       const cls = !s.enabled ? "off" : s.last_error ? "bad" : s.last_ok_at ? "ok" : "off";
       const sub = !s.enabled ? (s.disabled_reason || "Disabled")
         : s.last_error ? s.last_error
@@ -859,10 +863,10 @@ $("rClose").addEventListener("click", () => closePanel(false));
 
 /* ---------- local trends ---------- */
 let trends = store.get("trends", []);
-// Local trends are SW Florida's, so they ride along with that topic (and "For you" when it includes it).
+// Local trends are SW Florida's, so they show only for people with that shelf.
 const showTrends = () => {
   const t = curTab();
-  return trends.length > 0 && !state.kind && (t.topic === "swfl" || (!t.key && (!hasShelves() || me.shelves.some(s => s.topic === "swfl"))));
+  return trends.length > 0 && !state.kind && (t.topic === "swfl" || (!t.key && hasShelves() && me.shelves.some(s => s.topic === "swfl")));
 };
 function trendHTML() {
   // Six of each, one line apiece, fits a phone page without scrolling.
@@ -1239,7 +1243,7 @@ async function renderSuggestions() {
   if (!rows.length) { box.innerHTML = ""; return; }
   const key = store.get("ownerKey", "");
   box.innerHTML = `<div class="sec">Suggested by the weekly scout</div><div class="panel">${rows.map(r => `<div class="sugg" data-id="${r.id}">
-      <div><b>${esc(r.name)}</b> <span class="muted">· ${esc(TOPICS.find(t => t[0] === r.topic)?.[1] || r.topic)} · ${esc(r.domain)}</span></div>
+      <div><b>${esc(r.name)}</b> <span class="muted">· ${esc(TOPIC_NAMES[r.topic] || r.topic)} · ${esc(r.domain)}</span></div>
       <div class="muted">${esc(r.reason || "")} · ${Math.round(r.per_week || 0)} posts this week · ${Math.round((r.free_ratio || 0) * 100)}% free</div>
       <ul>${(r.samples || []).map(x => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a></li>`).join("")}</ul>
       <div class="acts">${key ? `<button class="add" data-act="add">Add source</button><button data-act="dismiss">Dismiss</button>` : `<span class="muted">Open your setup link on this device to approve sources.</span>`}</div>
@@ -1321,7 +1325,7 @@ async function openTopics(first) {
     <button class="bigbtn primary" id="pickGo" disabled>${first ? "Start reading" : "Add shelves"}</button>
     ${first ? `<button class="bigbtn" id="pickSkip">Skip for now</button>` : ""}`);
   let topics = [];
-  try { topics = await sb("tangent_topics?select=slug,name,blurb,is_default&order=position"); } catch { $("pick").textContent = "Could not load topics. Check your connection."; return; }
+  try { topics = await sb("tangent_topics?select=slug,name,blurb,is_default&listed=is.true&order=position"); } catch { $("pick").textContent = "Could not load topics. Check your connection."; return; }
   const have = new Set((me?.shelves || []).map(s => s.topic).filter(Boolean));
   $("pick").innerHTML = topics.map(t => `<button data-slug="${esc(t.slug)}" aria-pressed="${have.has(t.slug) || (first && t.is_default)}" ${have.has(t.slug) ? "disabled" : ""}>
     <b>${esc(t.name)}</b><span>${have.has(t.slug) ? "On your shelves" : esc(t.blurb)}</span><i aria-hidden="true"></i></button>`).join("");
@@ -1444,11 +1448,13 @@ function openShelf(id) {
   openPanel("shelf", `<button class="backlink" data-go="shelves">‹ Shelves</button><h1>${esc(x.name)}</h1>
     <form id="renForm"><label class="field"><span>Name</span><input id="renName" maxlength="40" value="${esc(x.name)}"></label></form>
     <div class="sec">Sources</div><ul class="list srcs" id="shelfSrcs">${x.sources.map(s => srcRow(s, id)).join("") || `<li><span class="txt"><span class="sub">No sources yet. Add some below.</span></span></li>`}</ul>
+    <div class="sec">Suggested sources</div><ul class="list srcs" id="suggSrcs"><li><span class="txt"><span class="sub">Finding sources\u2026</span></span></li></ul>
     <div class="sec">Add a source</div>
     <label class="field"><span>Search, or paste a website, feed or YouTube channel</span><input id="srcQ" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="vtdigger, electrek.co, @veritasium"></label>
     <p class="ferr" id="srcErr" role="alert"></p><ul class="list srcs" id="srcRes" hidden></ul>
     <button class="bigbtn danger" id="delShelf">Remove this shelf</button>`);
   $("shelfSrcs").dataset.shelf = id;
+  shelfSuggestions(id);
   // Rename saves when you leave the field or press return.
   const rename = async () => {
     const n = $("renName").value.trim();
@@ -1467,6 +1473,37 @@ function openShelf(id) {
     catch (er) { $("srcErr").textContent = er.message; }
   });
 }
+// Suggestions: catalog sources in the shelf's topic or with recent stories on its words (instant),
+// plus outlets the fetcher keeps finding in the news for the shelf's phrase.
+async function shelfSuggestions(id) {
+  const x = me.shelves.find(s => s.id === id), box = $("suggSrcs");
+  if (!x || !box) return;
+  const have = new Set(x.sources.map(s => s.id));
+  const out = new Map();
+  try {
+    if (x.topic) for (const r of await sb(`tangent_sources?select=id,name,site_url&topic=eq.${encodeURIComponent(x.topic)}&status=eq.active&enabled=is.true&kind=neq.search&order=name&limit=30`))
+      if (!have.has(r.id)) out.set("s" + r.id, { name: r.name, sub: "From this topic's catalog", source: r.id });
+    const words = fwords(x.query || x.name).map(w => w.replace(/[^\w-]/g, "")).filter(Boolean).slice(0, 3);
+    const look = async ws => sb(`tangent_feed?select=source_id,source_name,kind&and=(${ws.map(w => `title.ilike.${encodeURIComponent(`"*${w}*"`)}`).join(",")})&kind=neq.search&order=published_at.desc&limit=300`);
+    let rows = words.length ? await look(words) : [];
+    if (rows.length < 2 && words.length > 1) rows = await look([words.sort((a, b) => b.length - a.length)[0]]);
+    const count = new Map();
+    for (const r of rows) if (!have.has(r.source_id)) count.set(r.source_id, { name: r.source_name, n: (count.get(r.source_id)?.n || 0) + 1 });
+    for (const [sid, c] of [...count].filter(([, c]) => c.n >= 2).sort((a, b) => b[1].n - a[1].n).slice(0, 8))
+      if (!out.has("s" + sid)) out.set("s" + sid, { name: c.name, sub: `${c.n} recent stories on this`, source: sid });
+  } catch {}
+  try {
+    const { suggestions } = await api("shelves/suggestions?shelf=" + id);
+    for (const g of suggestions) {
+      const key = g.source ? "s" + g.source : "d" + g.domain;
+      if ((g.source && have.has(g.source)) || out.has(key)) continue;
+      out.set(key, { name: g.name, sub: `${g.domain} \u00b7 covered this ${g.hits} times lately`, source: g.source, url: g.url });
+    }
+  } catch {}
+  if (!$("suggSrcs")) return; // the panel moved on
+  box.innerHTML = [...out.values()].slice(0, 12).map(o => `<li><span class="txt"><b>${esc(o.name)}</b><span class="sub">${esc(o.sub)}</span></span>${o.source ? `<button class="small add" data-addsrc="${o.source}">Add</button>` : `<button class="small add" data-addurl="${esc(o.url)}">Add</button>`}</li>`).join("")
+    || `<li><span class="txt"><span class="sub">${x.query ? "Tangent is searching the news for this topic. Suggestions show up here within about 15 minutes." : "No suggestions right now. Search or paste a source below."}</span></span></li>`;
+}
 const looksLikeUrl = q => /^@[\w.-]{2,}$/.test(q) || (/^\S+\.[a-z]{2,}(\/\S*)?$/i.test(q) && !/\s/.test(q));
 async function searchSources(shelfId, mine, latest) {
   const q = $("srcQ").value.trim(), box = $("srcRes");
@@ -1483,7 +1520,7 @@ async function searchSources(shelfId, mine, latest) {
   box.innerHTML = out.join(""); box.hidden = false;
 }
 $("rBody").addEventListener("click", async e => {
-  const t = e.target.closest("[data-edit],[data-move],[data-unsrc],[data-addsrc],[data-req]");
+  const t = e.target.closest("[data-edit],[data-move],[data-unsrc],[data-addsrc],[data-addurl],[data-req]");
   if (!t) return;
   if (t.dataset.edit) return openShelf(+t.dataset.edit);
   if (t.dataset.move) {
@@ -1501,6 +1538,7 @@ $("rBody").addEventListener("click", async e => {
   try {
     if (t.dataset.unsrc) await api("shelves/source", { shelf, source: +t.dataset.unsrc, add: false });
     if (t.dataset.addsrc) await api("shelves/source", { shelf, source: +t.dataset.addsrc, add: true });
+    if (t.dataset.addurl) await api("shelves/request", { shelf, url: t.dataset.addurl });
     if (t.dataset.req) {
       const q = $("srcQ").value.trim();
       await api("shelves/request", t.dataset.req === "url" ? { shelf, url: q } : { shelf, query: q });
@@ -1509,7 +1547,7 @@ $("rBody").addEventListener("click", async e => {
     await refreshMe();
     const x = me.shelves.find(s => s.id === shelf);
     $("shelfSrcs").innerHTML = x.sources.map(s => srcRow(s, shelf)).join("") || `<li><span class="txt"><span class="sub">No sources yet. Add some below.</span></span></li>`;
-    if (t.dataset.addsrc) { t.replaceWith(Object.assign(document.createElement("span"), { className: "sub", textContent: "Added" })); }
+    if (t.dataset.addsrc || t.dataset.addurl) { t.replaceWith(Object.assign(document.createElement("span"), { className: "sub", textContent: "Added" })); }
   } catch (x) { $("srcErr").textContent = x.message; t.disabled = false; }
 });
 
@@ -1622,7 +1660,11 @@ $("rBody").addEventListener("click", async e => {
 // A tapped notification opens its story: /#a=123 on launch, or a message from the service worker.
 async function openArticle(id) {
   if (!state.items.some(x => x.id === id)) {
-    try { const rows = await sb(`tangent_feed?id=eq.${id}&select=*`); if (rows[0]) state.items.push(rows[0]); } catch {}
+    try {
+      const rows = await sb(`tangent_feed?id=eq.${id}&select=*`);
+      if (rows[0]?.kind === "search" && rows[0].author) rows[0].source_name = rows[0].author;
+      if (rows[0]) state.items.push(rows[0]);
+    } catch {}
   }
   if (view !== "news") setView("news");
   openReader(id);
@@ -1638,9 +1680,11 @@ async function load() {
     // With shelves, each shelf loads by its own sources. Sports always loads for the Sports tab.
     const queries = (hasShelves()
       ? me.shelves.filter(s => s.sources.length).map(s => `source_id=in.(${s.sources.map(x => x.id).join(",")})&limit=160`)
-      : TOPICS.map(t => t[0]).filter(Boolean).map(t => `topic=eq.${t}&limit=160`)).concat("topic=eq.sports&limit=60");
+      : TOPICS.map(t => t[0]).filter(Boolean).map(t => `topic=eq.${t}&limit=80`)).concat("topic=eq.sports&limit=60");
     const lists = await Promise.all(queries.map(q => sb(`tangent_feed?select=*&${q}&order=published_at.desc`)));
     const seen = new Set();
+    // Stories from a shelf's phrase search credit the outlet that published them.
+    for (const r of lists.flat()) if (r.kind === "search" && r.author) r.source_name = r.author;
     const rows = lists.flat().filter(r => !seen.has(r.id) && seen.add(r.id)).sort((a, b) => b.published_at.localeCompare(a.published_at));
     state.items = rows;
     store.set("feed", rows);

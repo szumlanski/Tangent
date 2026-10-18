@@ -27,16 +27,26 @@ export async function decode(gUrl) {
   return JSON.parse(JSON.parse(line)[0][2])[1];
 }
 
-export async function gnews(source) {
-  const q = encodeURIComponent(`site:${host(source.site_url)} when:2d`);
-  const r = await get(`https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`);
+async function search(q, limit = 25) {
+  const r = await get(`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=en-US&gl=US&ceid=US:en`);
   if (!r.ok) throw new Error(`gnews HTTP ${r.status}`);
-  const items = parseFeed(r.text).slice(0, 25);
+  const items = parseFeed(r.text).slice(0, limit);
   // Titles come as "Headline - Outlet"; drop the outlet suffix.
   for (const it of items) {
     if (it.sourceTitle) it.title = it.title.replace(new RegExp(`\\s+-\\s+${it.sourceTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`), "");
     it.excerpt = "";
     it.gnews = it.url;
   }
+  return items;
+}
+
+export const gnews = source => search(`site:${host(source.site_url)} when:2d`);
+
+// A shelf started from a phrase follows it across every outlet Google News covers.
+// The outlet's name rides along as the author, so cards can credit the real publisher.
+// A longer look back (days) also returns more items, which is what source suggestions need.
+export async function gsearch(source, days = 3) {
+  const items = await search(`${source.query} when:${days}d`, days > 3 ? 100 : 25);
+  for (const it of items) it.author = it.sourceTitle || null;
   return items;
 }

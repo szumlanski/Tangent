@@ -108,3 +108,20 @@ export const shelfSources = async ids => (await rest(
 export const recentSent = (ids, since) => rest(`tangent_alert_sent?user_id=in.${inList(ids)}&sent_at=gt.${encodeURIComponent(since)}&select=user_id,key,kind,alert_id,sent_at`);
 export const markSub = (id, patch) => rest(`tangent_push_subs?id=eq.${id}`, { method: "PATCH", body: patch, prefer: "return=minimal" });
 export const recordSent = row => rest("tangent_alert_sent?on_conflict=user_id,key", { method: "POST", body: [row], prefer: "resolution=ignore-duplicates,return=minimal" });
+
+// ---- vetting reader-added sources, and per-shelf suggestions ----
+export const pendingSources = n => rest(`tangent_sources?status=eq.pending&order=created_at&limit=${n}&select=*`);
+export const activeSearchSources = () => rest("tangent_sources?kind=eq.search&status=eq.active&enabled=is.true&select=id,query");
+export async function catalogByDomain() {
+  const rows = await rest("tangent_sources?status=eq.active&enabled=is.true&kind=neq.search&select=id,site_url");
+  const m = new Map();
+  for (const r of rows) { try { const d = new URL(r.site_url).hostname.replace(/^www\./, "").toLowerCase(); if (!m.has(d)) m.set(d, r.id); } catch {} }
+  return m;
+}
+export async function saveShelfSuggestions(searchSourceId, outlets) {
+  if (!outlets.length) return;
+  const shelves = await rest(`tangent_shelf_sources?source_id=eq.${searchSourceId}&removed_at=is.null&select=shelf_id`);
+  const at = new Date().toISOString();
+  const rows = shelves.flatMap(s => outlets.map(o => ({ shelf_id: s.shelf_id, domain: o.domain, name: o.name, url: o.url, source_id: o.source_id, hits: o.hits, updated_at: at })));
+  if (rows.length) await rest("tangent_shelf_suggestions?on_conflict=shelf_id,domain", { method: "POST", body: rows, prefer: "resolution=merge-duplicates,return=minimal" });
+}

@@ -157,6 +157,18 @@ const routes = {
     await rpc(env, "tangent_order_shelves", { p_user: user.id, p_ids: b.ids });
     return json({ ok: true });
   },
+  // Outlets the fetcher found covering a shelf's phrase (the app adds catalog suggestions itself).
+  async "GET shelves/suggestions"({ env, request, user }) {
+    const shelf = +new URL(request.url).searchParams.get("shelf");
+    if (!Number.isInteger(shelf) || shelf < 1) return json({ error: "Not found." }, 404);
+    return json({ suggestions: await rpc(env, "tangent_shelf_suggestions_get", { p_user: user.id, p_shelf: shelf }) });
+  },
+  async "POST shelves/suggestions/dismiss"({ env, request, user }) {
+    const b = await body(request);
+    if (typeof b.domain !== "string" || b.domain.length > 200) return json({ error: "Bad request." }, 400);
+    await rpc(env, "tangent_shelf_suggestion_dismiss", { p_user: user.id, p_shelf: +b.shelf, p_domain: b.domain });
+    return json({ ok: true });
+  },
   // Paste a site, feed or YouTube channel, or follow a phrase. New ones are checked by the fetcher before use.
   async "POST shelves/request"({ env, request, user }) {
     const b = await body(request);

@@ -1,7 +1,7 @@
 // One fetch pass over every enabled source. Run by GitHub Actions every 15 min.
 import { get, pool } from "./http.js";
 import { rss } from "./strategies/rss.js";
-import { gnews, decode } from "./strategies/gnews.js";
+import { gnews, gsearch, decode } from "./strategies/gnews.js";
 import { sitemap } from "./strategies/sitemap.js";
 import { scrape } from "./strategies/scrape.js";
 import { extract, plain } from "./extract.js";
@@ -10,11 +10,12 @@ import * as db from "./db.js";
 import { collectTrends } from "./trends.js";
 import { stories } from "./stories.js";
 import { alerts } from "./alerts.js";
+import { vetPending, refreshSuggestions } from "./vet.js";
 
-const STRATEGIES = { rss, gnews, sitemap, scrape };
+const STRATEGIES = { rss, gnews, gsearch, sitemap, scrape };
 // News goes stale fast; videos and blogs post less often.
 // Weekly papers post less often, so news looks back a week; ranking favors fresh stories anyway.
-const MAX_AGE = { news: 7 * 864e5, blog: 14 * 864e5, youtube: 14 * 864e5, podcast: 14 * 864e5 };
+const MAX_AGE = { search: 3 * 864e5, news: 7 * 864e5, blog: 14 * 864e5, youtube: 14 * 864e5, podcast: 14 * 864e5 };
 const MAX_NEW_PER_SOURCE = 15;
 const ROW_DEFAULTS = {
   origin_url: null, excerpt: null, image: null, author: null, body_html: null, word_count: null,
@@ -156,6 +157,9 @@ async function processSourceInner(source) {
   return { source: source.name, strategy: found.strategy, found: found.items.length, added: unique.length, paywalled };
 }
 
+// Sources readers added since the last run: check them first so the good ones are fetched now.
+await vetPending().catch(e => console.warn("vet:", e.message));
+
 // Trends move slowly; refresh them on the first run of each hour.
 const trends = new Date().getUTCMinutes() < 15 || process.env.TRENDS === "1"
   ? collectTrends().then(db.saveTrends).catch(e => console.warn("trends:", e.message))
@@ -172,6 +176,9 @@ await stories().catch(e => console.warn("stories:", e.message));
 
 // Push alerts for what just arrived (local matching, no AI).
 await alerts().catch(e => console.warn("alerts:", e.message));
+
+// Suggested sources for shelves that follow a phrase change slowly; refresh them hourly.
+if (new Date().getUTCMinutes() < 15) await refreshSuggestions().catch(e => console.warn("suggestions:", e.message));
 
 if (process.env.DRY === "1") {
   const rows = db.dryRows;
