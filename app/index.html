@@ -22,8 +22,8 @@
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="icon" href="app-icon-192.png" type="image/png">
-<link rel="apple-touch-icon" href="app-icon-180.png">
+<link rel="icon" href="app-icon-v2-192.png" type="image/png">
+<link rel="apple-touch-icon" href="app-icon-v2-180.png">
 <style>
 :root {
   --bg: #f4f1ec;
@@ -57,8 +57,8 @@ a { color: inherit; }
 /* Top bar: masthead + topic tabs + kind filter */
 .bar { position: fixed; inset: 0 0 auto 0; z-index: 20; background: var(--bar); backdrop-filter: saturate(1.6) blur(18px); -webkit-backdrop-filter: saturate(1.6) blur(18px); border-bottom: 0.5px solid var(--sep); padding-top: env(safe-area-inset-top, 0px); }
 .mast { display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 8px 0 16px; max-width: 1280px; margin: 0 auto; }
-.logo { min-height: 44px; font: 700 26px/1 var(--f-head); letter-spacing: -0.02em; display: flex; align-items: baseline; gap: 2px; }
-.logo i { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); display: inline-block; transform: translateY(-1px); }
+.logo { min-height: 44px; font: 700 26px/1 var(--f-head); letter-spacing: -0.02em; display: flex; align-items: center; gap: 4px; }
+.logo .mark { width: 22px; height: 24px; flex: none; }
 .mast-r { display: flex; align-items: center; }
 .icon-btn { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 22px; color: var(--label-2); }
 .icon-btn svg { width: 22px; height: 22px; }
@@ -316,7 +316,30 @@ details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; m
 <body>
 <header class="bar">
   <div class="mast">
-    <button class="logo" id="logo" aria-label="Tangent, back to the top">Tangent<i></i></button>
+    <button class="logo" id="logo" aria-label="Tangent, back to the top"><svg class="mark" aria-hidden="true" viewBox="105 30 315 335">
+<defs>
+<linearGradient id="tm-primaryOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#FF7A00" />
+<stop offset="100%" stop-color="#FF3D00" />
+</linearGradient>
+<linearGradient id="tm-tangentFlipOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#FFA043" />
+<stop offset="100%" stop-color="#FF5500" />
+</linearGradient>
+<linearGradient id="tm-accentGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#FFB366" />
+<stop offset="100%" stop-color="#FF8800" />
+</linearGradient>
+</defs>
+<g transform="translate(0, -5)">
+<rect x="215" y="180" width="70" height="175" rx="12" fill="url(#tm-primaryOrange)" opacity="0.9" />
+<path d="M 115 110 L 235 110 C 243.284 110 250 116.716 250 125 L 250 170 C 250 178.284 243.284 185 235 185 L 127 185 C 120.373 185 115 179.627 115 173 L 115 110 Z" fill="url(#tm-primaryOrange)" />
+<path d="M 250 110 C 320 110 385 80 405 50 C 390 110 345 185 250 185 L 250 110 Z" fill="url(#tm-tangentFlipOrange)" />
+<path d="M 250 110 C 320 110 385 80 405 50 C 388 72 355 112 300 135 C 275 145 250 148 250 148 Z" fill="url(#tm-accentGlow)" opacity="0.8" />
+<path d="M 250 140 C 290 140 330 125 350 105 C 335 140 300 185 250 185 Z" fill="#D84315" opacity="0.6" />
+<circle cx="405" cy="50" r="4" fill="#FF5500" />
+</g>
+</svg>Tangent</button>
     <div class="mast-r">
       <div class="kinds" role="group" aria-label="Show">
         <button data-kind="" aria-pressed="true">All</button>

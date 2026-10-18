@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
+<defs>
+<!-- Background Gradient -->
+<linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#0F1115" />
+<stop offset="100%" stop-color="#1A1D24" />
+</linearGradient>
+<!-- Vibrant Modern Orange Gradients -->
+<linearGradient id="primaryOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#FF7A00" />
+<stop offset="100%" stop-color="#FF3D00" />
+</linearGradient>
+<linearGradient id="tangentFlipOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#FFA043" />
+<stop offset="100%" stop-color="#FF5500" />
+</linearGradient>
+<linearGradient id="accentGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#FFB366" />
+<stop offset="100%" stop-color="#FF8800" />
+</linearGradient>
+<!-- Subtle Shadows for Depth -->
+<filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+<feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.4" />
+</filter>
+<filter id="flipShadow" x="-30%" y="-30%" width="160%" height="160%">
+<feDropShadow dx="-8" dy="12" stdDeviation="10" flood-color="#000000" flood-opacity="0.35" />
+</filter>
+<filter id="orangeGlow" x="-20%" y="-20%" width="140%" height="140%">
+<feGaussianBlur stdDeviation="8" result="blur" />
+<feComposite in="SourceGraphic" in2="blur" operator="over" />
+</filter>
+</defs>
+<rect width="500" height="500" fill="url(#bgGrad)" />
+<path d="M -50 380 L 400 -70" stroke="#FF5500" stroke-opacity="0.07" stroke-width="20" />
+<path d="M 100 520 L 520 100" stroke="#FF5500" stroke-opacity="0.04" stroke-width="10" />
+<g transform="translate(250 250) scale(0.82) translate(-262 -197)"><g transform="translate(0, -5)">
+<!-- T-Stem Base (Magazine Page Backing Layer) -->
+<rect x="215" y="180" width="70" height="175" rx="12" fill="url(#primaryOrange)" opacity="0.9" filter="url(#dropShadow)" />
+<!-- Left Horizontal Bar of 'T' (Solid Stable Wing) -->
+<path d="M 115 110 L 235 110 C 243.284 110 250 116.716 250 125 L 250 170 C 250 178.284 243.284 185 235 185 L 127 185 C 120.373 185 115 179.627 115 173 L 115 110 Z" fill="url(#primaryOrange)" filter="url(#dropShadow)" />
+<!-- Right Flown/Flipping 'T' Bar (Representing Tangent Curve & Flipboard Page Turn) -->
+<path d="M 250 110 C 320 110 385 80 405 50 C 390 110 345 185 250 185 L 250 110 Z" fill="url(#tangentFlipOrange)" filter="url(#flipShadow)" />
+<!-- Bright Accent Highlighting the Tangent Curved Page Edge -->
+<path d="M 250 110 C 320 110 385 80 405 50 C 388 72 355 112 300 135 C 275 145 250 148 250 148 Z" fill="url(#accentGlow)" opacity="0.8" />
+<!-- Flip Layer Underneath (Creating 3D Page Turn Depth) -->
+<path d="M 250 140 C 290 140 330 125 350 105 C 335 140 300 185 250 185 Z" fill="#D84315" opacity="0.6" />
+<!-- Modern Geometric News Node (The Tangent Touchpoint Dot) -->
+<circle cx="405" cy="50" r="15" fill="#FFF" opacity="0.18" />
+<circle cx="405" cy="50" r="9" fill="#FFF" />
+<circle cx="405" cy="50" r="4" fill="#FF5500" />
+</g></g>
+</svg>

@@ -1,15 +1,16 @@
 // Cache the whole app on install so it opens instantly and works offline.
 // Page files are served from cache first and refreshed in the background.
-const CACHE = "tangent-v14";
+const CACHE = "tangent-v15";
 const ASSETS = [
   "./",
   "help",
   "site.css",
   "manifest.webmanifest",
   "favicon.svg",
-  "app-icon-180.png",
-  "app-icon-192.png",
-  "app-icon-512.png",
+  "mark.svg",
+  "app-icon-v2-180.png",
+  "app-icon-v2-192.png",
+  "app-icon-v2-512.png",
 ];
 
 self.addEventListener("install", e => {

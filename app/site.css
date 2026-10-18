@@ -24,7 +24,7 @@ img { max-width: 100%; display: block; }
 .mast { border-bottom: 1px solid var(--rule); background: var(--bg); position: sticky; top: 0; z-index: 5; padding-top: env(safe-area-inset-top, 0px); }
 .mast .wrap { display: flex; align-items: center; justify-content: space-between; height: 56px; }
 .logo { font: 700 28px/1 var(--f-head); letter-spacing: -0.02em; color: var(--label); text-decoration: none; display: inline-flex; align-items: baseline; gap: 2px; min-height: 44px; align-items: center; }
-.logo i { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); display: inline-block; margin-top: 10px; }
+.logo .mark { width: 28px; height: 30px; margin-right: 6px; }
 .mast nav { display: flex; gap: 4px; align-items: center; }
 .mast nav a { min-height: 44px; display: inline-flex; align-items: center; padding: 0 10px; color: var(--label); text-decoration: none; font-weight: 600; font-size: 16px; }
 .mast nav a.hide-sm { display: none; }
