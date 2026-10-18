@@ -1,6 +1,6 @@
 # Tangent: notes for Claude
 
-- Live site: https://tangent.szumlanski.com (Cloudflare Pages project `tangent`, Git-connected). Pushing to `main` deploys; there is no build step and the output directory is `app/`.
+- Live site: https://tangentreads.com (Cloudflare Pages project `tangent`, Git-connected; www and the old tangent.szumlanski.com redirect there via `functions/_middleware.js`). `app/_routes.json` decides which paths run functions: add any new function route to it. Pushing to `main` deploys; there is no build step and the output directory is `app/`.
 - Always merge finished work to `main` and push to deploy. Do not ask Jason first.
 - The web app is `app/index.html` (UI, CSS, JS). Keep it one self-contained file with no outside scripts or fonts so it stays fast and works offline.
 - The fetcher is Node in `fetcher/`, run by `.github/workflows/fetch.yml`: each run loops for about 5h40m and fetches every 15 min (GitHub's own schedule fires hours late), pulling new code between rounds. Run `npm test` and `DRY=1 npm run fetch` before pushing fetcher changes. Behind the cloud proxy, set `NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt`.

@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Tangent</title>
 <script>
+// One address: copies opened from an old one (including installed apps served from the offline cache) move over.
+if (location.hostname === "tangent.szumlanski.com" || location.hostname === "www.tangentreads.com")
+  location.replace("https://tangentreads.com" + location.pathname + location.search + location.hash);
 // Signed out and not looking around as a guest: show the welcome page instead of the app.
 (function () {
   try {
