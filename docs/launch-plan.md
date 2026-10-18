@@ -31,7 +31,8 @@ non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
       feedback and settings, rate limits, server-secret RPCs. Migrate Jason's current data to his admin account.
 - [x] 4. Auth API (Pages Functions): sign up, sign in, sign out, session check, Google OAuth (code flow + PKCE),
       password change, account deletion, rate limiting. Unit tests for cookie signing and input validation.
-- [ ] 5. App: public landing page, sign-in/sign-up sheet, onboarding (pick suggested topics), signed-in feed per shelf.
+- [ ] 5. App: professional public landing page (hero, how it works, features, screenshots, FAQ, footer with privacy/terms/help), sign-in/sign-up sheet, onboarding (pick suggested topics), signed-in feed per shelf.
+- [ ] 5b. Help: public help page (/help) with full FAQ, and an in-app Help and FAQ section in the account menu.
 - [ ] 6. Shelves editor: add, rename, reorder, delete shelves; add or remove sources per shelf; search the catalog;
       paste any URL or YouTube channel; create a topic shelf from a phrase.
 - [ ] 7. Source requests and discovery: pasted URLs and topic phrases are vetted by the fetcher job (feed found,
@@ -55,3 +56,4 @@ non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
 - 2026-10-18 item 2: +13 Vermont (10 free, plus Manchester Journal, Bennington Banner, Brattleboro Reformer as new 'subscriber' headline-only sources: all their articles are marked paid), +21 across solar, tech, world, SWFL, travel. Fixed a paywall false positive (Piano analytics script on free WCAX pages); news window 3 to 7 days for weekly papers.
 - 2026-10-18 item 3: users, sessions, topics, shelves, shelf sources, rate limits, per-user feedback; 22 server-secret functions (secret hash in tangent_config, secret in Cloudflare env via API). End-to-end tested with a throwaway account (closed afterwards). Owner claims admin and old votes by signing in on a device holding the owner key.
 - 2026-10-18 item 4: /api/v1 router (lib/server.js + functions/api/v1/[[path]].js): email sign-up/in/out, Google code flow with PKCE (live once Jason adds GOOGLE_CLIENT_ID/SECRET), sessions as HMAC-signed HttpOnly cookies, rate limits per IP and per email, same-origin check on POSTs, shelves, feedback, settings, password change, delete, owner claim. 4 unit tests; 22-step end-to-end run against the real database passed.
+- 2026-10-18 Jason: hide used an x on cards but a crossed-out eye in the reader; same action, now the eye everywhere.
