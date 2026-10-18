@@ -818,7 +818,7 @@ async function openReader(id, swap = false) {
       if (first && it.image && first.src.split("?")[0] === it.image.split("?")[0]) first.closest("figure")?.remove() ?? first.remove();
     } else {
       // Full text is kept for a few days to keep storage small; older stories link to the original.
-      $("rText").insertAdjacentHTML("beforeend", `<div class="notice">${row?.extracted ? `Tangent keeps the full text of stories for 3 days. Tap Original to read this one on ${esc(it.source_name)}.` : `Full text was not available for this one. Tap Original to read it on ${esc(it.source_name)}.`}</div>`);
+      $("rText").insertAdjacentHTML("beforeend", `<div class="notice">${row?.extracted ? `Tangent keeps the full text of stories for 3 weeks. Tap Original to read this one on ${esc(it.source_name)}.` : `Full text was not available for this one. Tap Original to read it on ${esc(it.source_name)}.`}</div>`);
     }
   } catch {
     if (!$("rText")) return;

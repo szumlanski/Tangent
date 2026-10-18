@@ -1,9 +1,9 @@
-// Daily cleanup so Tangent stays small inside the shared free database (EG4 Monitor, 500 MB total).
-// Full article text is kept a few days (the reader then links to the original); stories two weeks,
+// Daily cleanup so Tangent stays a small guest in the EG4 Monitor database (Pro plan, 8 GB included).
+// Full article text is kept three weeks (the reader then links to the original); stories two months,
 // except ones someone voted on or hid. Logs and send records are trimmed too. Runs at most once a day.
 import * as db from "./db.js";
 
-export const BODY_DAYS = 3;      // full text
+export const BODY_DAYS = 21;     // full text
 export const LOG_DAYS = 180;     // activity and security log (promised in the privacy policy)
 export const SENT_DAYS = 90;     // push send records (they only stop repeats)
 const DAY = 864e5;
