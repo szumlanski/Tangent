@@ -56,6 +56,19 @@ ol.steps { padding: 0; }
 
 .shot { margin-top: 28px; border-radius: 14px; overflow: hidden; border: 1px solid var(--sep); box-shadow: 0 24px 50px -24px rgba(0,0,0,0.3); }
 .closing { text-align: center; }
+.pgrid { display: grid; gap: 36px; align-items: center; }
+@media (min-width: 900px) { .pgrid { grid-template-columns: 1.1fr 0.9fr; gap: 64px; } }
+#personas h2 { font-size: 30px; margin-bottom: 4px; }
+@media (min-width: 900px) { #personas h2 { font-size: 40px; } }
+.ticks { list-style: none; padding: 0; margin: 20px 0 0; display: grid; gap: 8px; }
+.ticks li { padding-left: 26px; position: relative; }
+.ticks li::before { content: ""; position: absolute; left: 4px; top: 7px; width: 10px; height: 6px; border: solid var(--tint); border-width: 0 0 2.5px 2.5px; transform: rotate(-45deg); }
+.pdemo { display: grid; gap: 12px; }
+.pcard { display: grid; grid-template-columns: 56px 1fr; grid-template-rows: auto auto; gap: 2px 14px; align-items: center; background: var(--card); border-radius: 16px; padding: 14px 16px; border: 1px solid var(--sep); }
+.pcard .pav { grid-row: span 2; width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; font-size: 26px; }
+.pcard b { font: 700 20px/1.2 var(--f-head); }
+.pcard > span:last-child { color: var(--label-2); font-size: 15px; }
+.pcard.on { border: 2px solid var(--tint); }
 .closing h2 { font-size: 34px; }
 .closing .cta { justify-content: center; max-width: 460px; margin-left: auto; margin-right: auto; }
 
@@ -92,6 +105,7 @@ dialog.auth::backdrop { background: rgba(0,0,0,0.45); }
     <a class="logo" href="/welcome" aria-label="Tangent home"><img class="mark" src="mark.svg" alt="" width="28" height="30">Tangent</a>
     <nav aria-label="Site">
       <a class="hide-sm" href="#how">How it works</a>
+      <a class="hide-sm" href="#personas">Personas</a>
       <a class="hide-sm" href="#faq">FAQ</a>
       <a href="#signin" data-auth="signin">Sign in</a>
     </nav>
@@ -138,8 +152,30 @@ dialog.auth::backdrop { background: rgba(0,0,0,0.45); }
         <div class="feat"><h3>Learns gently</h3><p>Your votes shift a story by hours, not days. Your feed bends toward what you like without hiding the news you need.</p></div>
         <div class="feat"><h3>Blogs and video too</h3><p>Personal blogs, newsletters and YouTube channels sit next to the newspapers. Videos play right in the reader.</p></div>
         <div class="feat"><h3>Markets and scores</h3><p>Delayed quotes and charts for the indexes and funds you watch, plus scores, schedules and rankings for your teams.</p></div>
+        <div class="feat"><h3>Personas</h3><p>One login, several front pages: work, home, or one per passion. Each keeps its own shelves, taste and alerts.</p></div>
+        <div class="feat"><h3>Alerts that respect you</h3><p>Hear about big stories, or any word, shelf or source you choose. One alert per story, a daily limit, and quiet hours overnight.</p></div>
       </div>
       <div class="shot"><img src="shot-desktop.jpg" width="1280" height="800" loading="lazy" alt="Tangent on a computer: a magazine grid of story cards under topic tabs"></div>
+    </div>
+  </section>
+
+  <section class="band" id="personas">
+    <div class="wrap pgrid">
+      <div>
+        <p class="kicker">Personas</p>
+        <h2>One login. As many front pages as you need.</h2>
+        <p class="lede">Most news apps give you one feed and hope it fits. Tangent lets you make a persona for work and one for home, or one for each passion. Every persona has its own picture, shelves, votes and alerts, so your work reading never crowds out game day. Switching takes one tap.</p>
+        <ul class="ticks">
+          <li>Up to 8 personas under one login</li>
+          <li>Each one learns its own taste from your thumbs up and down</li>
+          <li>Your own photo, an emoji or a color for each</li>
+        </ul>
+      </div>
+      <div class="pdemo" aria-hidden="true">
+        <div class="pcard on"><span class="pav" style="background:#1d6fd1">💼</span><b>Work</b><span>Solar &amp; energy · Business · Politics</span></div>
+        <div class="pcard"><span class="pav" style="background:#1d8a43">🏠</span><b>Home</b><span>Local news · Food · Travel</span></div>
+        <div class="pcard"><span class="pav" style="background:#c8401a">🏈</span><b>Game day</b><span>Sports · Red Sox · Fantasy football</span></div>
+      </div>
     </div>
   </section>
 
@@ -152,6 +188,8 @@ dialog.auth::backdrop { background: rgba(0,0,0,0.45); }
         <details><summary>How do you keep paywalled articles out?</summary><div class="a"><p>Each article is checked when it is fetched: the publisher's own free or paid markup, known paywall systems, and whether the full text is actually readable. Locked articles are dropped. A few local papers that lock most stories can be followed as headline-only cards marked Subscriber, which open on the paper's site.</p></div></details>
         <details><summary>Can I add any website or YouTube channel?</summary><div class="a"><p>Yes. Paste a site address, a feed or a YouTube channel into a shelf. If Tangent can read it without a paywall, it joins your shelf and its stories show up within about 15 minutes.</p></div></details>
         <details><summary>Do I need an account?</summary><div class="a"><p>No. You can look around without one. An account saves your shelves, sources, votes and hidden stories, and keeps them in sync between your phone and computer.</p></div></details>
+        <details><summary>What is a persona?</summary><div class="a"><p>A separate set of shelves, votes and alerts under your one login, with its own name and picture. Make one for work and one for home, or one per interest, and switch between them from the person button at the top of the app.</p></div></details>
+        <details><summary>Can I get notifications?</summary><div class="a"><p>Yes, on any phone or computer that supports web notifications, with or without an account. Without one you get big-story alerts; with one you can add your own words, shelves and sources. On iPhone, add Tangent to your Home Screen first.</p></div></details>
         <details><summary>Does it work on my phone?</summary><div class="a"><p>Yes. On iPhone, open tangentreads.com in Safari, tap Share, then Add to Home Screen. On Android, open it in Chrome and tap Install app. It opens full screen like any other app.</p></div></details>
         <details><summary>What do you do with my data?</summary><div class="a"><p>We keep your email, name, shelves and votes so the app works, and nothing else. No ads, no trackers, no selling data. You can delete your account at any time. Read the <a href="/privacy">privacy policy</a>.</p></div></details>
       </div>

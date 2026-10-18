@@ -8,6 +8,7 @@ const BIG_FRESH_H = 24;            // ...and its first article is this recent
 const SHELF_GAP_MIN = 60;          // shelf alerts: at most one per shelf per hour
 const PER_RUN = 3;                 // pushes per user per run; the rest wait for the next story
 export const DEFAULTS = { max: 10, quiet: [22, 7] };   // per day; quiet from 10 pm to 7 am local time
+const GUEST = { max: 5, quiet: [22, 7] };              // devices without an account get big stories only
 
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 export const phraseRe = p => new RegExp(`(^|[^a-z0-9])${esc(p.toLowerCase())}($|[^a-z0-9])`, "i");
@@ -36,8 +37,8 @@ export function plan({ articles, bigStories, alerts, users, shelves, sent, tzByU
     const prefs = { ...DEFAULTS, ...(users.get(uid)?.settings?.alerts || {}) };
     if (inQuiet(prefs.quiet, localHour(tzByUser.get(uid), now))) continue;
     const s = sent.get(uid) || { keys: new Set(), today: 0, shelfLast: new Map() };
-    const mine = shelves.get(uid) || [];
-    const mySources = new Set(mine.flatMap(x => [...x.sources]));
+    // Each persona has its own shelves; alerts from before personas fall back to the user's.
+    const shelvesOf = al => shelves.get(al.persona_id) || shelves.get(uid) || [];
     const msgs = [];
     const storyKey = a => a.cluster_id ? "c" + a.cluster_id : "a" + a.id;
     for (const al of list) {
@@ -55,13 +56,14 @@ export function plan({ articles, bigStories, alerts, users, shelves, sent, tzByU
           msgs.push({ rank: 1, key: `src:${al.id}:${storyKey(a)}`, alert: al, title: a.source_name, body: clip(a.title, 160), article: a });
       }
       if (al.kind === "big") {
+        const mine = shelvesOf(al), mySources = new Set(mine.flatMap(x => [...x.sources]));
         for (const b of bigStories) {
           if (mine.length && ![...b.sources].some(x => mySources.has(x))) continue;
           msgs.push({ rank: 2, key: `big:${b.cluster_id}`, alert: al, title: `Big story · ${b.outlets} outlets`, body: clip(b.headline || b.lead.title, 160), article: b.lead });
         }
       }
       if (al.kind === "shelf" && al.shelf_id) {
-        const shelf = mine.find(x => x.id === al.shelf_id);
+        const shelf = shelvesOf(al).find(x => x.id === al.shelf_id);
         const last = s.shelfLast.get(al.id);
         if (!shelf || (last && now - last < SHELF_GAP_MIN * 6e4)) continue;
         const hits = articles.filter(a => shelf.sources.has(a.source_id));
@@ -91,8 +93,8 @@ export async function alerts() {
   const cfg = await db.config(["vapid_public", "vapid_private", "alerts_cursor"]);
   const now = new Date();
   const cursor = cfg.alerts_cursor || new Date(now - 20 * 6e4).toISOString();
-  const subs = await db.pushSubs();
-  if (!cfg.vapid_private || !subs.length) return db.setConfig("alerts_cursor", now.toISOString());
+  const [subs, guests] = await Promise.all([db.pushSubs(), db.guestSubs()]);
+  if (!cfg.vapid_private || (!subs.length && !guests.length)) return db.setConfig("alerts_cursor", now.toISOString());
 
   const articles = await db.newArticles(cursor, new Date(now - 24 * 36e5).toISOString());
   const nextCursor = articles.length ? articles[articles.length - 1].fetched_at : cursor;
@@ -114,13 +116,15 @@ export async function alerts() {
   }
 
   const userIds = [...new Set(subs.map(s => s.user_id))];
-  const [alertRows, userRows, shelfRows, sentRows] = await Promise.all([
-    db.activeAlerts(userIds), db.usersById(userIds), db.shelfSources(userIds), db.recentSent(userIds, new Date(now - 7 * 864e5).toISOString()),
-  ]);
+  const weekAgo = new Date(now - 7 * 864e5).toISOString();
+  const [alertRows, userRows, shelfRows, sentRows, guestSent] = await Promise.all(userIds.length
+    ? [db.activeAlerts(userIds), db.usersById(userIds), db.shelfSources(userIds), db.recentSent(userIds, weekAgo), db.recentGuestSent(guests.map(g => g.id), weekAgo)]
+    : [[], [], [], [], db.recentGuestSent(guests.map(g => g.id), weekAgo)]);
   const users = new Map(userRows.map(u => [u.id, u]));
   const shelves = new Map();
   for (const r of shelfRows) {
-    const list = shelves.get(r.user_id) || shelves.set(r.user_id, []).get(r.user_id);
+    const owner = r.persona_id || r.user_id;
+    const list = shelves.get(owner) || shelves.set(owner, []).get(owner);
     let sh = list.find(x => x.id === r.shelf_id);
     if (!sh) list.push(sh = { id: r.shelf_id, name: r.name, sources: new Set() });
     sh.sources.add(r.source_id);
@@ -133,26 +137,41 @@ export async function alerts() {
     if (Date.parse(r.sent_at) > dayAgo) s.today++;
     if (r.kind === "shelf" && r.alert_id) s.shelfLast.set(r.alert_id, new Date(Math.max(+(s.shelfLast.get(r.alert_id) || 0), Date.parse(r.sent_at))));
   }
-  const tzByUser = new Map(subs.map(s => [s.user_id, s.tz]));
+  // Each guest device is its own reader with one big-story alert.
+  for (const g of guests) {
+    const gid = "g" + g.id;
+    alertRows.push({ id: null, user_id: gid, kind: "big" });
+    users.set(gid, { settings: { alerts: GUEST } });
+  }
+  for (const r of guestSent) {
+    const gid = "g" + r.sub_id;
+    const s = sent.get(gid) || sent.set(gid, { keys: new Set(), today: 0, shelfLast: new Map() }).get(gid);
+    s.keys.add(r.key);
+    if (Date.parse(r.sent_at) > dayAgo) s.today++;
+  }
+  const tzByUser = new Map([...subs.map(s => [s.user_id, s.tz]), ...guests.map(g => ["g" + g.id, g.tz])]);
   const todo = plan({ articles, bigStories, alerts: alertRows.filter(a => users.has(a.user_id)), users, shelves, sent, tzByUser, now });
 
   webpush.setVapidDetails("https://tangentreads.com", cfg.vapid_public, cfg.vapid_private);
   let pushed = 0;
   for (const m of todo) {
-    const devices = subs.filter(s => s.user_id === m.user_id);
+    const guest = m.user_id.startsWith("g");
+    const devices = guest ? guests.filter(g => "g" + g.id === m.user_id) : subs.filter(s => s.user_id === m.user_id);
+    const mark = guest ? db.markGuestSub : db.markSub;
     const payload = JSON.stringify({ title: m.title, body: m.body, url: m.url, tag: m.key });
     let ok = 0;
     for (const d of devices) {
       try {
         await webpush.sendNotification({ endpoint: d.endpoint, keys: { p256dh: d.p256dh, auth: d.auth } }, payload, { TTL: 6 * 3600, urgency: m.kind === "big" ? "high" : "normal" });
         ok++;
-        await db.markSub(d.id, { last_ok_at: now.toISOString() });
+        await mark(d.id, { last_ok_at: now.toISOString() });
       } catch (e) {
         // 404/410: the browser dropped this subscription for good.
-        await db.markSub(d.id, [404, 410].includes(e.statusCode) ? { disabled_at: now.toISOString(), failed_at: now.toISOString() } : { failed_at: now.toISOString() });
+        await mark(d.id, [404, 410].includes(e.statusCode) ? { disabled_at: now.toISOString(), failed_at: now.toISOString() } : { failed_at: now.toISOString() });
       }
     }
-    await db.recordSent({ user_id: m.user_id, key: m.key, alert_id: m.alert_id, kind: m.kind, title: m.body, url: m.url, devices: ok });
+    if (guest) await db.recordGuestSent({ sub_id: +m.user_id.slice(1), key: m.key, title: m.body, url: m.url });
+    else await db.recordSent({ user_id: m.user_id, key: m.key, alert_id: m.alert_id, kind: m.kind, title: m.body, url: m.url, devices: ok });
     pushed += ok;
   }
   await db.setConfig("alerts_cursor", nextCursor);

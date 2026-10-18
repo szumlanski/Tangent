@@ -50,3 +50,18 @@ test("quiet hours, including overnight ranges", () => {
   const r = plan(base({ articles: [art(1, "Storm")], alerts: [{ id: 5, user_id: U, kind: "keyword", phrase: "storm" }], now: new Date("2026-10-18T03:00:00Z") }));
   assert.equal(r.length, 0);
 });
+
+test("big stories follow each persona's own shelves", () => {
+  const big = { cluster_id: 7, headline: "Fed cuts rates", outlets: 6, sources: new Set([50]), lead: art(10, "x", { cluster_id: 7 }) };
+  const shelves = new Map([[11, [{ id: 1, name: "Business", sources: new Set([50]) }]], [12, [{ id: 2, name: "Hobbies", sources: new Set([90]) }]]]);
+  const work = plan(base({ bigStories: [big], shelves, alerts: [{ id: 1, user_id: U, persona_id: 11, kind: "big" }] }));
+  const play = plan(base({ bigStories: [big], shelves, alerts: [{ id: 2, user_id: U, persona_id: 12, kind: "big" }] }));
+  assert.equal(work.length, 1);
+  assert.equal(play.length, 0);
+});
+
+test("guest devices get any big story", () => {
+  const big = { cluster_id: 8, headline: "Quake", outlets: 5, sources: new Set([3]), lead: art(11, "x", { cluster_id: 8 }) };
+  const r = plan(base({ bigStories: [big], alerts: [{ id: null, user_id: "g5", kind: "big" }], users: new Map([["g5", { settings: { alerts: { max: 5, quiet: [22, 7] } } }]]), tzByUser: new Map([["g5", "UTC"]]) }));
+  assert.deepEqual(r.map(x => [x.user_id, x.key]), [["g5", "big:8"]]);
+});

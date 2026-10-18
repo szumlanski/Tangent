@@ -60,3 +60,12 @@ test("push subscriptions must point at a browser push service", () => {
   assert.equal(pushSub({ endpoint: "https://fcm.googleapis.com.evil.example/x", keys }), null);
   assert.equal(pushSub({ endpoint: "https://fcm.googleapis.com/x", keys: { p256dh: "x", auth: "y" } }), null);
 });
+
+test("persona input checks", async () => {
+  const { personaInput } = await import("../functions/api/v1/[[path]].js");
+  assert.deepEqual(personaInput({ name: " Work ", emoji: "\u{1F4BC}", color: "#c8401a" }), { name: "Work", emoji: "\u{1F4BC}", color: "#c8401a" });
+  assert.ok(personaInput({ avatar: "data:image/jpeg;base64,/9j/4AAQSkZJRg==" }).avatar);
+  assert.equal(personaInput({ avatar: "" }).avatar, "");
+  for (const bad of [{ name: "" }, { name: "x".repeat(31) }, { avatar: "https://evil.example/x.png" }, { avatar: "data:image/svg+xml;base64,PHN2Zz4=" }, { avatar: "data:image/png;base64," + "A".repeat(40001) }, { color: "red" }, { id: "1" }])
+    assert.ok(personaInput(bad).error, JSON.stringify(bad).slice(0, 60));
+});

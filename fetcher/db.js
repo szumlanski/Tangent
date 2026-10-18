@@ -99,13 +99,17 @@ export const newArticles = async (cursor, since) => (await rest(
   .map(({ tangent_sources, ...a }) => ({ ...a, source_name: tangent_sources?.name || "" }));
 export const storyMembers = ids =>
   rest(`tangent_feed?cluster_id=in.${inList(ids)}&select=id,title,source_id,source_name,cluster_id,published_at,image,story_headline&limit=3000`);
-export const activeAlerts = ids => rest(`tangent_alerts?removed_at=is.null&enabled=is.true&user_id=in.${inList(ids)}&select=id,user_id,kind,phrase,shelf_id,source_id`);
+export const activeAlerts = ids => rest(`tangent_alerts?removed_at=is.null&enabled=is.true&user_id=in.${inList(ids)}&select=id,user_id,persona_id,kind,phrase,shelf_id,source_id`);
 export const usersById = ids => rest(`tangent_users?id=in.${inList(ids)}&deleted_at=is.null&select=id,settings`);
 export const shelfSources = async ids => (await rest(
-  `tangent_shelf_sources?removed_at=is.null&select=shelf_id,source_id,tangent_shelves!inner(user_id,name)` +
+  `tangent_shelf_sources?removed_at=is.null&select=shelf_id,source_id,tangent_shelves!inner(user_id,persona_id,name)` +
   `&tangent_shelves.user_id=in.${inList(ids)}&tangent_shelves.removed_at=is.null`))
-  .map(r => ({ shelf_id: r.shelf_id, source_id: r.source_id, user_id: r.tangent_shelves.user_id, name: r.tangent_shelves.name }));
+  .map(r => ({ shelf_id: r.shelf_id, source_id: r.source_id, user_id: r.tangent_shelves.user_id, persona_id: r.tangent_shelves.persona_id, name: r.tangent_shelves.name }));
 export const recentSent = (ids, since) => rest(`tangent_alert_sent?user_id=in.${inList(ids)}&sent_at=gt.${encodeURIComponent(since)}&select=user_id,key,kind,alert_id,sent_at`);
+export const guestSubs = async () => DRY ? [] : rest("tangent_guest_subs?disabled_at=is.null&select=id,endpoint,p256dh,auth,tz");
+export const markGuestSub = (id, patch) => rest(`tangent_guest_subs?id=eq.${id}`, { method: "PATCH", body: patch, prefer: "return=minimal" });
+export const recentGuestSent = (ids, since) => ids.length ? rest(`tangent_guest_sent?sub_id=in.${inList(ids)}&sent_at=gt.${encodeURIComponent(since)}&select=sub_id,key,sent_at`) : [];
+export const recordGuestSent = row => rest("tangent_guest_sent?on_conflict=sub_id,key", { method: "POST", body: [row], prefer: "resolution=ignore-duplicates,return=minimal" });
 export const markSub = (id, patch) => rest(`tangent_push_subs?id=eq.${id}`, { method: "PATCH", body: patch, prefer: "return=minimal" });
 export const recordSent = row => rest("tangent_alert_sent?on_conflict=user_id,key", { method: "POST", body: [row], prefer: "resolution=ignore-duplicates,return=minimal" });
 

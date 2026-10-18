@@ -14,10 +14,27 @@ const randomToken = (n = 32) => b64url(crypto.getRandomValues(new Uint8Array(n))
 const sha256url = async s => b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s))));
 
 // Friendly messages for errors the database raises on purpose.
-const KNOWN = { too_many_alerts: [400, "You can have up to 50 alerts."], bad_url: [400, "That address does not look like a website."], email_taken: [409, "That email already has an account. Sign in instead."], too_many_shelves: [400, "You can have up to 30 shelves."], not_found: [404, "Not found."] };
+const KNOWN = { too_many_personas: [400, "You can have up to 8 personas."], last_persona: [400, "You need at least one persona."], too_many_alerts: [400, "You can have up to 50 alerts."], bad_url: [400, "That address does not look like a website."], email_taken: [409, "That email already has an account. Sign in instead."], too_many_shelves: [400, "You can have up to 30 shelves."], not_found: [404, "Not found."] };
 
 async function body(request) {
   try { return await request.json(); } catch { return {}; }
+}
+
+const timeZone = tz => typeof tz === "string" && /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){0,2}$/.test(tz) ? tz : null;
+
+// Persona fields from the app. Pictures arrive already shrunk to a small JPEG or WebP data URL.
+export function personaInput(b) {
+  const p = {};
+  if (b.id != null) { if (!Number.isInteger(b.id)) return { error: "Bad persona." }; p.id = b.id; }
+  if (b.name != null) { if (typeof b.name !== "string" || !b.name.trim() || b.name.length > 30) return { error: "Use a name of 1 to 30 characters." }; p.name = b.name.trim(); }
+  if (b.avatar != null) {
+    if (b.avatar !== "" && (typeof b.avatar !== "string" || b.avatar.length > 40000 || !/^data:image\/(jpeg|webp|png);base64,[A-Za-z0-9+/]+=*$/.test(b.avatar))) return { error: "That picture could not be used. Try a different one." };
+    p.avatar = b.avatar;
+  }
+  if (b.emoji != null) { if (typeof b.emoji !== "string" || [...b.emoji].length > 4) return { error: "Pick one emoji." }; p.emoji = b.emoji; }
+  if (b.color != null) { if (typeof b.color !== "string" || !/^(#[0-9a-f]{6})?$/i.test(b.color)) return { error: "Bad color." }; p.color = b.color; }
+  if (b.settings != null) { if (typeof b.settings !== "object" || JSON.stringify(b.settings).length > 4000) return { error: "Settings too large." }; p.settings = b.settings; }
+  return p;
 }
 
 // Limit: true when allowed.
@@ -102,8 +119,8 @@ const routes = {
   },
 
   // ---- signed-in user ----
-  async "GET me"({ env, user }) {
-    const me = await rpc(env, "tangent_me", { p_user: user.id });
+  async "GET me"({ env, user, persona }) {
+    const me = await rpc(env, "tangent_me", { p_user: user.id, p_persona: persona });
     return json({ ...me, google: !!env.GOOGLE_CLIENT_ID });
   },
 
@@ -135,18 +152,31 @@ const routes = {
     return json({ ok: !!ok });
   },
 
+  // ---- personas ----
+  async "POST personas/save"({ env, request, user }) {
+    const b = await body(request);
+    const p = personaInput(b);
+    if (p.error) return json({ error: p.error }, 400);
+    return json({ id: await rpc(env, "tangent_persona_save", { p_user: user.id, p_p: p }) });
+  },
+  async "POST personas/remove"({ env, request, user }) {
+    const b = await body(request);
+    await rpc(env, "tangent_persona_remove", { p_user: user.id, p_id: +b.id });
+    return json({ ok: true });
+  },
+
   // ---- shelves ----
-  async "POST shelves/topics"({ env, request, user }) {
+  async "POST shelves/topics"({ env, request, user, persona }) {
     const b = await body(request);
     if (!Array.isArray(b.topics) || b.topics.length > 30) return json({ error: "Pick some topics." }, 400);
-    await rpc(env, "tangent_add_topic_shelves", { p_user: user.id, p_topics: b.topics.map(String) });
-    return json(await rpc(env, "tangent_me", { p_user: user.id }));
+    await rpc(env, "tangent_add_topic_shelves", { p_user: user.id, p_persona: persona, p_topics: b.topics.map(String) });
+    return json(await rpc(env, "tangent_me", { p_user: user.id, p_persona: persona }));
   },
-  async "POST shelves/save"({ env, request, user }) {
+  async "POST shelves/save"({ env, request, user, persona }) {
     const b = await body(request);
     if (!b.id && !(typeof b.name === "string" && b.name.trim())) return json({ error: "Give the shelf a name." }, 400);
     const query = typeof b.query === "string" ? b.query.trim().slice(0, 80) : "";
-    const id = await rpc(env, "tangent_save_shelf", { p_user: user.id, p_shelf: { id: b.id ?? null, name: b.name ?? null, position: b.position ?? null, query: query || null } });
+    const id = await rpc(env, "tangent_save_shelf", { p_user: user.id, p_persona: persona, p_shelf: { id: b.id ?? null, name: b.name ?? null, position: b.position ?? null, query: query || null } });
     // A shelf started from a phrase follows that phrase in the news from the first fetch.
     if (!b.id && query) await rpc(env, "tangent_request_source", { p_user: user.id, p_shelf: id, p_url: null, p_query: query });
     return json({ id });
@@ -191,10 +221,10 @@ const routes = {
   },
 
   // ---- alerts and push ----
-  async "GET alerts"({ env, user }) {
-    return json(await rpc(env, "tangent_alerts_get", { p_user: user.id }));
+  async "GET alerts"({ env, user, persona }) {
+    return json(await rpc(env, "tangent_alerts_get", { p_user: user.id, p_persona: persona }));
   },
-  async "POST alerts/save"({ env, request, user }) {
+  async "POST alerts/save"({ env, request, user, persona }) {
     const b = await body(request);
     const a = { id: b.id ?? null, kind: b.kind, enabled: typeof b.enabled === "boolean" ? b.enabled : null };
     if (!a.id) {
@@ -207,19 +237,28 @@ const routes = {
       if (b.kind === "shelf") a.shelf = +b.shelf;
       if (b.kind === "source") a.source = +b.source;
     }
-    return json({ id: await rpc(env, "tangent_alert_save", { p_user: user.id, p_alert: a }) });
+    return json({ id: await rpc(env, "tangent_alert_save", { p_user: user.id, p_persona: persona, p_alert: a }) });
   },
   async "POST alerts/remove"({ env, request, user }) {
     const b = await body(request);
     await rpc(env, "tangent_alert_remove", { p_user: user.id, p_id: +b.id });
     return json({ ok: true });
   },
-  async "POST push/subscribe"({ env, request, user }) {
+  async "POST push/subscribe"({ env, request, user, persona }) {
     const b = await body(request);
     const sub = pushSub(b.subscription);
     if (!sub) return json({ error: "This browser's notification service is not supported." }, 400);
-    const tz = typeof b.tz === "string" && /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){0,2}$/.test(b.tz) ? b.tz : null;
-    await rpc(env, "tangent_push_subscribe", { p_user: user.id, p_endpoint: sub.endpoint, p_p256dh: sub.p256dh, p_auth: sub.auth, p_ua: request.headers.get("user-agent") || "", p_tz: tz });
+    const tz = timeZone(b.tz);
+    await rpc(env, "tangent_push_subscribe", { p_user: user.id, p_persona: persona, p_endpoint: sub.endpoint, p_p256dh: sub.p256dh, p_auth: sub.auth, p_ua: request.headers.get("user-agent") || "", p_tz: tz });
+    return json({ ok: true });
+  },
+  // Big-story alerts for people without an account. The device keeps its own random key to turn them off.
+  async "POST push/guest"({ env, request }) {
+    const b = await body(request);
+    const sub = pushSub(b.subscription);
+    if (!sub || typeof b.key !== "string" || !/^[A-Za-z0-9_-]{32,64}$/.test(b.key)) return json({ error: "This browser's notification service is not supported." }, 400);
+    if (!(await allow(env, "guestpush:" + clientIp(request), 20, 3600))) return json({ error: "Too many tries. Try again later." }, 429);
+    await rpc(env, "tangent_guest_push", { p_endpoint: sub.endpoint, p_p256dh: sub.p256dh, p_auth: sub.auth, p_ua: request.headers.get("user-agent") || "", p_tz: timeZone(b.tz), p_key: b.key, p_on: b.on !== false });
     return json({ ok: true });
   },
   async "POST push/unsubscribe"({ env, request, user }) {
@@ -229,18 +268,18 @@ const routes = {
   },
 
   // ---- votes and hides ----
-  async "GET feedback"({ env, user }) {
-    return json(await rpc(env, "tangent_user_feedback", { p_user: user.id }));
+  async "GET feedback"({ env, user, persona }) {
+    return json(await rpc(env, "tangent_user_feedback", { p_user: user.id, p_persona: persona }));
   },
-  async "POST feedback"({ env, request, user }) {
+  async "POST feedback"({ env, request, user, persona }) {
     const b = await body(request);
     const vote = b.vote == null ? null : Math.max(-1, Math.min(1, Math.trunc(b.vote)));
-    await rpc(env, "tangent_user_set_feedback", { p_user: user.id, p_article: +b.article, p_vote: vote, p_hidden: b.hidden ?? null });
+    await rpc(env, "tangent_user_set_feedback", { p_user: user.id, p_persona: persona, p_article: +b.article, p_vote: vote, p_hidden: b.hidden ?? null });
     return json({ ok: true });
   },
 };
 
-const PUBLIC = new Set(["POST auth/signup", "POST auth/login", "POST auth/logout", "GET auth/config", "GET auth/google", "GET auth/google/callback"]);
+const PUBLIC = new Set(["POST push/guest", "POST auth/signup", "POST auth/login", "POST auth/logout", "GET auth/config", "GET auth/google", "GET auth/google/callback"]);
 
 export async function onRequest(context) {
   const { request, env, params } = context;
@@ -252,7 +291,9 @@ export async function onRequest(context) {
   try {
     const { sid, user } = await currentUser(env, request);
     if (!PUBLIC.has(key) && !user) return json({ error: "Please sign in." }, 401, { "set-cookie": signOutCookies() });
-    return await handler({ env, request, sid, user });
+    // The device's chosen persona; the database falls back to the first one if it is missing or not theirs.
+    const persona = /^\d{1,12}$/.test(request.headers.get("x-persona") || "") ? +request.headers.get("x-persona") : null;
+    return await handler({ env, request, sid, user, persona });
   } catch (e) {
     const known = KNOWN[e.message];
     if (known) return json({ error: known[1] }, known[0]);
