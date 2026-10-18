@@ -48,7 +48,7 @@ a { color: inherit; }
 /* Top bar: masthead + topic tabs + kind filter */
 .bar { position: fixed; inset: 0 0 auto 0; z-index: 20; background: var(--bar); backdrop-filter: saturate(1.6) blur(18px); -webkit-backdrop-filter: saturate(1.6) blur(18px); border-bottom: 0.5px solid var(--sep); padding-top: env(safe-area-inset-top, 0px); }
 .mast { display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 8px 0 16px; max-width: 1280px; margin: 0 auto; }
-.logo { font: 700 26px/1 var(--f-head); letter-spacing: -0.02em; display: flex; align-items: baseline; gap: 2px; }
+.logo { min-height: 44px; font: 700 26px/1 var(--f-head); letter-spacing: -0.02em; display: flex; align-items: baseline; gap: 2px; }
 .logo i { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); display: inline-block; transform: translateY(-1px); }
 .mast-r { display: flex; align-items: center; }
 .icon-btn { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 22px; color: var(--label-2); }
@@ -272,7 +272,7 @@ details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; m
 <body>
 <header class="bar">
   <div class="mast">
-    <div class="logo" aria-label="Tangent">Tangent<i></i></div>
+    <button class="logo" id="logo" aria-label="Tangent, back to the top">Tangent<i></i></button>
     <div class="mast-r">
       <div class="kinds" role="group" aria-label="Show">
         <button data-kind="" aria-pressed="true">All</button>
@@ -576,6 +576,18 @@ $("grid").addEventListener("click", e => {
   if (card) openReader(+card.dataset.id);
 });
 
+/* Back to the first page (phone) or the top of the grid / tab (desktop and other tabs). */
+function toTop() {
+  if (view === "news" && !isDesktop() && state.page > 0) {
+    // One flip back reads as "home"; the page under it is already the first one.
+    pages.length && (state.page = 1);
+    store.set("page:" + state.topic + state.kind, 0);
+    if (reduceMotion || flip) { state.page = 0; renderStage(); }
+    else go(-1);
+  }
+  scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+}
+
 /* ---------- render ---------- */
 function render() {
   const list = visible();
@@ -593,6 +605,7 @@ function renderTabs() {
 $("tabs").addEventListener("click", e => {
   const b = e.target.closest(".tab");
   if (!b) return;
+  if (b.dataset.topic === state.topic) return toTop();
   state.topic = b.dataset.topic; store.set("topic", state.topic);
   renderTabs(); render();
   b.scrollIntoView({ inline: "center", block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
@@ -754,8 +767,12 @@ function setView(v) {
 }
 $("sections").addEventListener("click", e => {
   const b = e.target.closest("button");
-  if (b) setView(b.dataset.view);
+  if (!b) return;
+  // Tapping the tab you are already on goes back to the top, like iOS tab bars.
+  if (b.dataset.view === view) return toTop();
+  setView(b.dataset.view);
 });
+$("logo").addEventListener("click", () => view === "news" ? toTop() : setView("news"));
 
 /* ---------- stocks ---------- */
 const TICKERS = [["SPX", "S&P 500"], ["COMP", "Nasdaq"], ["DJI", "Dow Jones"], ["VOO", "VOO"], ["SCHB", "SCHB"], ["KO", "Coca-Cola"]];
