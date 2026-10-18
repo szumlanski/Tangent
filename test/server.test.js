@@ -12,9 +12,10 @@ test("session cookie signature round-trips and rejects tampering", async () => {
 });
 
 test("sign-up validation", () => {
-  assert.equal(checkSignup({ email: "a@b.co", password: "0123456789" }), null);
+  assert.equal(checkSignup({ email: "a@b.co", password: "01234567" }), null);
+  assert.match(checkSignup({ email: "a@b.co", password: "0123456" }), /8 characters/);
   assert.match(checkSignup({ email: "nope", password: "0123456789" }), /valid email/);
-  assert.match(checkSignup({ email: "a@b.co", password: "short" }), /10 characters/);
+  assert.match(checkSignup({ email: "a@b.co", password: "short" }), /8 characters/);
   assert.match(checkSignup({ email: "a@b.co", password: "0123456789", name: "x".repeat(61) }), /60 characters/);
 });
 

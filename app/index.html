@@ -1340,14 +1340,14 @@ async function openHelp() {
 function openPassword() {
   const has = me.user.has_password;
   openPanel("password", `<h1>${has ? "Change password" : "Set a password"}</h1>
-    <p class="lead">${has ? "Use at least 10 characters." : "Add a password so you can also sign in with your email."}</p>
+    <p class="lead">${has ? "Use at least 8 characters." : "Add a password so you can also sign in with your email."}</p>
     <form id="pwForm">${has ? `<label class="field"><span>Current password</span><input type="password" id="pwCur" autocomplete="current-password" required></label>` : ""}
-    <label class="field"><span>New password</span><input type="password" id="pwNew" autocomplete="new-password" minlength="10" required></label>
+    <label class="field"><span>New password</span><input type="password" id="pwNew" autocomplete="new-password" minlength="8" required></label>
     <p class="ferr" id="pwErr" role="alert"></p><button class="bigbtn primary">Save password</button></form>`);
   $("pwForm").addEventListener("submit", async e => {
     e.preventDefault();
     const nw = $("pwNew").value;
-    if (nw.length < 10) { $("pwErr").textContent = "Use a password of at least 10 characters."; return; }
+    if (nw.length < 8) { $("pwErr").textContent = "Use a password of at least 8 characters."; return; }
     try {
       await api("me/password", { current: $("pwCur")?.value ?? null, new: nw });
       setMe({ ...me, user: { ...me.user, has_password: true } });

@@ -115,7 +115,7 @@ const routes = {
 
   async "POST me/password"({ env, request, user }) {
     const b = await body(request);
-    if (typeof b.new !== "string" || b.new.length < 10 || b.new.length > 200) return json({ error: "Use a password of at least 10 characters." }, 400);
+    if (typeof b.new !== "string" || b.new.length < 8 || b.new.length > 200) return json({ error: "Use a password of at least 8 characters." }, 400);
     if (!(await allow(env, "pw:" + user.id, 10, 3600))) return json({ error: "Too many tries. Try again later." }, 429);
     const ok = await rpc(env, "tangent_set_password", { p_user: user.id, p_current: b.current ?? null, p_new: b.new });
     return ok ? json({ ok: true }) : json({ error: "Your current password is not right." }, 403);

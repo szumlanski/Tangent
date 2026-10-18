@@ -197,8 +197,8 @@ dialog.auth::backdrop { background: rgba(0,0,0,0.45); }
       <label for="fEmail">Email</label>
       <input id="fEmail" name="email" type="email" autocomplete="email" inputmode="email" required>
       <label for="fPass">Password</label>
-      <input id="fPass" name="password" type="password" autocomplete="new-password" minlength="10" required>
-      <div class="hint" id="passHint">At least 10 characters.</div>
+      <input id="fPass" name="password" type="password" autocomplete="new-password" minlength="8" required>
+      <div class="hint" id="passHint">At least 8 characters.</div>
       <p class="err" id="authErr" role="alert"></p>
       <button class="btn primary" id="authGo" type="submit">Create account</button>
     </form>
@@ -251,7 +251,7 @@ $("authForm").addEventListener("submit", async e => {
   const email = $("fEmail").value.trim(), password = $("fPass").value, name = $("fName").value.trim();
   const err = $("authErr");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { err.textContent = "Enter a valid email address."; return; }
-  if (mode === "signup" && password.length < 10) { err.textContent = "Use a password of at least 10 characters."; return; }
+  if (mode === "signup" && password.length < 8) { err.textContent = "Use a password of at least 8 characters."; return; }
   if (!password) { err.textContent = "Enter your password."; return; }
   err.textContent = "";
   $("authGo").disabled = true;
