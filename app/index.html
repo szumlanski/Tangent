@@ -65,7 +65,16 @@ a { color: inherit; }
 .mast-r { display: flex; align-items: center; }
 .icon-btn { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 22px; color: var(--label-2); }
 .icon-btn svg { width: 22px; height: 22px; }
-.tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 0 12px 8px; max-width: 1280px; margin: 0 auto; }
+.tabwrap { position: relative; max-width: 1280px; margin: 0 auto; }
+.tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 0 12px 8px; touch-action: pan-x; overscroll-behavior-x: contain; }
+/* When more shelves are off screen, fade that edge and show an arrow that scrolls the row. */
+.tabs.more-r { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 72px), transparent calc(100% - 28px)); mask-image: linear-gradient(to right, #000 calc(100% - 72px), transparent calc(100% - 28px)); }
+.tabs.more-l { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 72px), transparent calc(100% - 28px)); mask-image: linear-gradient(to left, #000 calc(100% - 72px), transparent calc(100% - 28px)); }
+.tabs.more-l.more-r { -webkit-mask-image: linear-gradient(to right, transparent 28px, #000 72px, #000 calc(100% - 72px), transparent calc(100% - 28px)); mask-image: linear-gradient(to right, transparent 28px, #000 72px, #000 calc(100% - 72px), transparent calc(100% - 28px)); }
+.tab-arrow { position: absolute; top: -4px; width: 44px; height: 44px; display: grid; place-items: center; color: var(--label); }
+.tab-arrow svg { width: 20px; height: 20px; }
+#tabsNext { right: 0; }
+#tabsPrev { left: 0; }
 .tabs::-webkit-scrollbar { display: none; }
 .tab { flex: none; height: 36px; padding: 0 14px; border-radius: 18px; font-size: 15px; font-weight: 600; color: var(--label-2); white-space: nowrap; }
 .tab[aria-selected="true"] { background: var(--label); color: var(--bg); }
@@ -194,7 +203,7 @@ a { color: inherit; }
 .sections button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; font-weight: 600; color: var(--label-2); }
 .sections svg { width: 26px; height: 26px; }
 .sections button[aria-selected="true"] { color: var(--tint); }
-body:not(.v-news) .tabs, body:not(.v-news) .kinds, body:not(.v-news) .stage, body:not(.v-news) .pager, body:not(.v-news) .grid, body:not(.v-news) .empty { display: none !important; }
+body:not(.v-news) .tabwrap, body:not(.v-news) .kinds, body:not(.v-news) .stage, body:not(.v-news) .pager, body:not(.v-news) .grid, body:not(.v-news) .empty { display: none !important; }
 body:not(.v-news) { --top: calc(env(safe-area-inset-top, 0px) + 49px); }
 .view { max-width: 1280px; margin: 0 auto; padding: calc(var(--top) + 12px) 12px calc(var(--tabbar) + 24px); }
 .view h2 { font: 700 24px/1.2 var(--f-head); margin: 22px 4px 10px; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
@@ -411,7 +420,11 @@ details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; m
       <button class="icon-btn" id="acctBtn" aria-label="Account, shelves and help"></button>
     </div>
   </div>
-  <nav class="tabs" id="tabs" role="tablist"></nav>
+  <div class="tabwrap">
+    <nav class="tabs" id="tabs" role="tablist"></nav>
+    <button class="tab-arrow" id="tabsPrev" aria-label="Earlier shelves" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button class="tab-arrow" id="tabsNext" aria-label="More shelves" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+  </div>
 </header>
 
 <nav class="sections" id="sections" role="tablist" aria-label="Sections">
@@ -774,14 +787,26 @@ function renderTabs() {
   allIds = new Set((me?.shelves || []).flatMap(s => s.sources.map(x => x.id)));
   if (!tabs().some(t => t.key === state.topic)) { state.topic = ""; store.set("topic", ""); }
   $("tabs").innerHTML = tabs().map(t => `<button class="tab" role="tab" data-topic="${t.key}" aria-selected="${t.key === state.topic}">${esc(t.label)}</button>`).join("");
+  tabEdges();
 }
+function tabEdges() {
+  const t = $("tabs"), l = t.scrollLeft > 4, r = t.scrollLeft + t.clientWidth < t.scrollWidth - 4;
+  t.classList.toggle("more-l", l); t.classList.toggle("more-r", r);
+  $("tabsPrev").hidden = !l; $("tabsNext").hidden = !r;
+}
+$("tabs").addEventListener("scroll", tabEdges, { passive: true });
+new ResizeObserver(tabEdges).observe($("tabs"));
+for (const [id, dir] of [["tabsNext", 1], ["tabsPrev", -1]])
+  $(id).addEventListener("click", () => { const t = $("tabs"); t.scrollBy({ left: dir * t.clientWidth * 0.7, behavior: reduceMotion ? "auto" : "smooth" }); });
+// A mouse wheel scrolls the row sideways on computers.
+$("tabs").addEventListener("wheel", e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { $("tabs").scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
 $("tabs").addEventListener("click", e => {
   const b = e.target.closest(".tab");
   if (!b) return;
   if (b.dataset.topic === state.topic) return toTop();
   state.topic = b.dataset.topic; store.set("topic", state.topic);
   renderTabs(); render();
-  b.scrollIntoView({ inline: "center", block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+  $("tabs").querySelector('[aria-selected="true"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
   scrollTo(0, 0);
 });
 document.querySelector(".kinds").addEventListener("click", e => {
