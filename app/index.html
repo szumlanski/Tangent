@@ -343,6 +343,9 @@ details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; m
 .backlink { min-height: 44px; color: var(--tint); font-weight: 600; margin: -6px 0 4px -2px; }
 .bigbtn.danger { color: var(--down); }
 .faq h2 { font: 700 22px/1.2 var(--f-head); margin: 28px 0 6px; }
+.invite { margin: 32px 0 8px; padding: 18px 18px 8px; border-radius: 14px; background: var(--card); border: 1px solid var(--sep); }
+.invite b { font: 700 19px/1.3 var(--f-head); }
+.invite p { color: var(--label-2); margin: 8px 0 14px; font-size: 16px; }
 .faq details { border-bottom: 0.5px solid var(--sep); }
 .faq summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 14px; min-height: 52px; padding: 10px 0; font-weight: 600; }
 .faq summary::-webkit-details-marker { display: none; }
@@ -418,6 +421,7 @@ details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; m
       <button class="icon-btn" data-vote="1" aria-label="More like this" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M7 10v11H3V10zM7 10l4-8a2.5 2.5 0 0 1 3 2.5V9h5.5a2 2 0 0 1 2 2.3l-1.3 8A2 2 0 0 1 18.2 21H7"/></svg></button>
       <button class="icon-btn" data-vote="-1" aria-label="Fewer like this" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M17 14V3h4v11zM17 14l-4 8a2.5 2.5 0 0 1-3-2.5V15H4.5a2 2 0 0 1-2-2.3l1.3-8A2 2 0 0 1 5.8 3H17"/></svg></button>
       <button class="icon-btn" data-hide-reader aria-label="Hide this story"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-3 3.8M6.2 6.2C3.8 7.9 2.5 12 2.5 12S6 19 12 19a9.6 9.6 0 0 0 5.3-1.5M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg></button>
+      <button class="icon-btn" id="rShare" aria-label="Share this story"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg></button>
       <a class="pill" id="rOrig" target="_blank" rel="noopener noreferrer">Original</a>
     </div>
   </div>
@@ -790,6 +794,9 @@ async function openReader(id, swap = false) {
   document.body.style.overflow = "hidden";
   if (location.hash !== "#read" && !swap) history.pushState({ read: id }, "", "#read");
 
+  if (!signedIn()) $("rText").insertAdjacentHTML("afterend", `<aside class="invite"><b>${sessionStorage.getItem("fromShare") ? "Someone shared this with you on Tangent." : "You are reading Tangent without an account."}</b>
+    <p>Tangent is a free news reader. Pick the outlets, blogs and YouTube channels you follow, and get one card per story with no paywalls.</p>
+    <a class="bigbtn primary" href="/welcome?a=${it.id}#signup">Create a free account</a></aside>`);
   if (it.kind === "youtube") return;
   if (it.locked) {
     $("rText").insertAdjacentHTML("beforeend", `<div class="notice">${ICON_LOCK} ${esc(it.source_name)} is a subscriber paper, so Tangent shows only the headline. Tap Original to read it on their site, where your free articles or subscription apply.</div>`);
@@ -797,6 +804,8 @@ async function openReader(id, swap = false) {
   }
   try {
     const [row] = await sb(`tangent_articles?id=eq.${id}&select=body_html,extracted`);
+    // Another story or a sheet may have replaced this one while the text loaded.
+    if (!$("rText") || +$("reader").dataset.id !== id || panel) return;
     if (row?.extracted && row.body_html) {
       const html = clean(row.body_html, it.url);
       // Readability often repeats the hero image as the first figure.
@@ -807,6 +816,7 @@ async function openReader(id, swap = false) {
       $("rText").insertAdjacentHTML("beforeend", `<div class="notice">Full text was not available for this one. Tap Original to read it on ${esc(it.source_name)}.</div>`);
     }
   } catch {
+    if (!$("rText")) return;
     $("rText").insertAdjacentHTML("beforeend", `<div class="notice">Could not load the article. Check your connection, or tap Original.</div>`);
   }
 }
@@ -1375,7 +1385,10 @@ async function openTopics(first) {
       const res = await api("shelves/topics", { topics: slugs });
       store.set("picked:" + me.persona, true);
       setMe({ ...me, ...res });
-      if (first) { closePanel(false); toast("You're all set. Change your shelves any time from the account menu."); }
+      if (first) {
+        closePanel(false); toast("You're all set. Change your shelves any time from the account menu.");
+        if (launchArticle) setTimeout(() => openArticle(launchArticle), 400); // arrived from a shared link
+      }
       else { openShelves(); toast("Shelves added"); }
     } catch (e) { $("pickErr").textContent = e.message; $("pickGo").disabled = false; }
   });
@@ -1852,6 +1865,24 @@ async function openArticle(id) {
 }
 const launchArticle = +(location.hash.match(/^#a=(\d+)$/) || [])[1] || 0;
 navigator.serviceWorker?.addEventListener("message", e => { const m = (e.data?.open || "").match(/#a=(\d+)$/); if (m) openArticle(+m[1]); });
+
+/* ---------- sharing ---------- */
+// Links always point at the public domain, carry the sharer's first name, and open a share page that
+// lets the recipient read the story in Tangent with or without an account.
+const SHARE_ORIGIN = "https://tangentreads.com";
+async function shareArticle(id) {
+  const it = state.items.find(x => x.id === id);
+  if (!it) return;
+  const first = (me?.user?.name || "").trim().split(/\s+/)[0];
+  const url = `${SHARE_ORIGIN}/s/${id}${/^[\p{L}][\p{L}'.-]{0,29}$/u.test(first) ? `?f=${encodeURIComponent(first)}` : ""}`;
+  if (navigator.share) {
+    try { await navigator.share({ title: it.title, text: `${it.title} (${it.source_name}, via Tangent)`, url }); } catch {}
+    return;
+  }
+  try { await navigator.clipboard.writeText(url); toast("Link copied. Paste it anywhere to share."); }
+  catch { prompt("Copy this link to share the story:", url); }
+}
+$("rShare").addEventListener("click", () => shareArticle(+$("reader").dataset.id));
 
 /* ---------- load ---------- */
 async function load() {

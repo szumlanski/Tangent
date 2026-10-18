@@ -188,6 +188,7 @@ dialog.auth::backdrop { background: rgba(0,0,0,0.45); }
         <details><summary>How do you keep paywalled articles out?</summary><div class="a"><p>Each article is checked when it is fetched: the publisher's own free or paid markup, known paywall systems, and whether the full text is actually readable. Locked articles are dropped. A few local papers that lock most stories can be followed as headline-only cards marked Subscriber, which open on the paper's site.</p></div></details>
         <details><summary>Can I add any website or YouTube channel?</summary><div class="a"><p>Yes. Paste a site address, a feed or a YouTube channel into a shelf. If Tangent can read it without a paywall, it joins your shelf and its stories show up within about 15 minutes.</p></div></details>
         <details><summary>Do I need an account?</summary><div class="a"><p>No. You can look around without one. An account saves your shelves, sources, votes and hidden stories, and keeps them in sync between your phone and computer.</p></div></details>
+        <details><summary>Someone shared a story with me. Do I need an account?</summary><div class="a"><p>No. Tap Read it in Tangent and the story opens right away. If you like how Tangent reads, an account is free and takes about a minute.</p></div></details>
         <details><summary>What is a persona?</summary><div class="a"><p>A separate set of shelves, votes and alerts under your one login, with its own name and picture. Make one for work and one for home, or one per interest, and switch between them from the person button at the top of the app.</p></div></details>
         <details><summary>Can I get notifications?</summary><div class="a"><p>Yes, on any phone or computer that supports web notifications, with or without an account. Without one you get big-story alerts; with one you can add your own words, shelves and sources. On iPhone, add Tangent to your Home Screen first.</p></div></details>
         <details><summary>Does it work on my phone?</summary><div class="a"><p>Yes. On iPhone, open tangentreads.com in Safari, tap Share, then Add to Home Screen. On Android, open it in Chrome and tap Install app. It opens full screen like any other app.</p></div></details>
@@ -301,7 +302,9 @@ $("authForm").addEventListener("submit", async e => {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || "Something went wrong. Please try again.");
     // New accounts go straight to picking shelves.
-    location.href = mode === "signup" ? "/#welcome" : "/";
+    // Arrived from a shared story (?a=123): land on that story.
+    const story = /^\d{1,12}$/.test(q.get("a") || "") ? "/#a=" + q.get("a") : "";
+    location.href = story || (mode === "signup" ? "/#welcome" : "/");
   } catch (x) {
     err.textContent = x instanceof TypeError ? "No connection. Check your internet and try again." : x.message;
     $("authGo").disabled = false;
