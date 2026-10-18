@@ -23,7 +23,7 @@ non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
   new topic has stories within one fetch run, plus discovery suggests real outlets for it.
 
 ## Checklist
-- [ ] 1. Feed loads per shelf/topic from the server (no global 400-newest cap; this is why Vermont was empty).
+- [x] 1. Feed loads per shelf/topic from the server (no global 400-newest cap; this is why Vermont was empty).
 - [ ] 2. More sources for every topic. Vermont first: Manchester Journal, Bennington Banner, Brattleboro Reformer,
       Rutland Herald, Valley News, WCAX, NBC5, Vermont Business Magazine, Addison Independent, Stowe Reporter and others
       that pass the paywall and freshness checks. Then 3 to 6 more per other topic.
@@ -48,3 +48,4 @@ non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
 - Optional: Resend account for password-reset emails (free 3,000/month).
 
 ## Log
+- 2026-10-18 item 1: app loads each topic's newest 160 (sports 60) separately. Vermont went from 2 visible stories to 82. Shelves (item 6) will move this server-side per user.

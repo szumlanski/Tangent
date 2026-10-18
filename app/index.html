@@ -1124,7 +1124,12 @@ document.addEventListener("click", async e => {
 /* ---------- load ---------- */
 async function load() {
   try {
-    const rows = await sb("tangent_feed?select=*&order=published_at.desc&limit=400");
+    // Each topic loads its own newest stories, so a quiet topic (Vermont) is never crowded
+    // out by a busy one (sports videos). Bodies are not in the feed, so this stays light.
+    const slugs = [...TOPICS.map(t => t[0]).filter(Boolean), "sports"];
+    const lists = await Promise.all(slugs.map(t =>
+      sb(`tangent_feed?select=*&topic=eq.${encodeURIComponent(t)}&order=published_at.desc&limit=${t === "sports" ? 60 : 160}`)));
+    const rows = lists.flat().sort((a, b) => b.published_at.localeCompare(a.published_at));
     state.items = rows;
     store.set("feed", rows);
     if (view === "news") render();
