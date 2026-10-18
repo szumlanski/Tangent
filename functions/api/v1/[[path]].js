@@ -2,7 +2,7 @@
 // Content (articles, sources) stays public and is read by the app directly from the database.
 import {
   rpc, json, sign, unsign, readCookie, cookieHeader, signOutCookies,
-  checkSignup, startSession, currentUser, sameOrigin, clientIp, EMAIL_RE,
+  checkSignup, startSession, currentUser, sameOrigin, clientIp, EMAIL_RE, sourceUrl,
 } from "../../../lib/server.js";
 
 const GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -14,7 +14,7 @@ const randomToken = (n = 32) => b64url(crypto.getRandomValues(new Uint8Array(n))
 const sha256url = async s => b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s))));
 
 // Friendly messages for errors the database raises on purpose.
-const KNOWN = { email_taken: [409, "That email already has an account. Sign in instead."], too_many_shelves: [400, "You can have up to 30 shelves."], not_found: [404, "Not found."] };
+const KNOWN = { bad_url: [400, "That address does not look like a website."], email_taken: [409, "That email already has an account. Sign in instead."], too_many_shelves: [400, "You can have up to 30 shelves."], not_found: [404, "Not found."] };
 
 async function body(request) {
   try { return await request.json(); } catch { return {}; }
@@ -145,8 +145,27 @@ const routes = {
   async "POST shelves/save"({ env, request, user }) {
     const b = await body(request);
     if (!b.id && !(typeof b.name === "string" && b.name.trim())) return json({ error: "Give the shelf a name." }, 400);
-    const id = await rpc(env, "tangent_save_shelf", { p_user: user.id, p_shelf: { id: b.id ?? null, name: b.name ?? null, position: b.position ?? null, query: b.query ?? null } });
+    const query = typeof b.query === "string" ? b.query.trim().slice(0, 80) : "";
+    const id = await rpc(env, "tangent_save_shelf", { p_user: user.id, p_shelf: { id: b.id ?? null, name: b.name ?? null, position: b.position ?? null, query: query || null } });
+    // A shelf started from a phrase follows that phrase in the news from the first fetch.
+    if (!b.id && query) await rpc(env, "tangent_request_source", { p_user: user.id, p_shelf: id, p_url: null, p_query: query });
     return json({ id });
+  },
+  async "POST shelves/order"({ env, request, user }) {
+    const b = await body(request);
+    if (!Array.isArray(b.ids) || b.ids.length > 30 || !b.ids.every(Number.isInteger)) return json({ error: "Bad order." }, 400);
+    await rpc(env, "tangent_order_shelves", { p_user: user.id, p_ids: b.ids });
+    return json({ ok: true });
+  },
+  // Paste a site, feed or YouTube channel, or follow a phrase. New ones are checked by the fetcher before use.
+  async "POST shelves/request"({ env, request, user }) {
+    const b = await body(request);
+    const query = typeof b.query === "string" ? b.query.trim() : "";
+    const url = query ? null : sourceUrl(b.url);
+    if (!query && !url) return json({ error: "Paste a website, feed or YouTube channel address." }, 400);
+    if (query.length > 80) return json({ error: "Keep the phrase under 80 characters." }, 400);
+    if (!(await allow(env, "src:" + user.id, 40, 86400))) return json({ error: "That's a lot of new sources for one day. Try again tomorrow." }, 429);
+    return json({ source: await rpc(env, "tangent_request_source", { p_user: user.id, p_shelf: +b.shelf, p_url: url, p_query: query || null }) });
   },
   async "POST shelves/remove"({ env, request, user }) {
     const b = await body(request);

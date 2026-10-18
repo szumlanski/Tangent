@@ -300,6 +300,18 @@ details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; m
 .field span { display: block; font-size: 15px; font-weight: 600; margin-bottom: 6px; }
 .field input { width: 100%; min-height: 48px; border-radius: 10px; border: 1px solid var(--sep); background: var(--card); color: var(--label); font: 400 17px var(--f-ui); padding: 0 14px; }
 .ferr { color: var(--down); font-weight: 600; font-size: 15px; min-height: 1px; margin: 0 0 12px; }
+.shelves li, .srcs li { display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 16px; }
+.shelves .sh-open { flex: 1; min-width: 0; text-align: left; min-height: 52px; display: grid; align-content: center; gap: 2px; }
+.shelves .sh-open b, .srcs b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shelves .sh-open span, .srcs .sub { font-size: 14px; color: var(--label-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shelves .icon-btn:disabled { opacity: .3; }
+.srcs .txt { flex: 1; min-width: 0; display: grid; gap: 2px; padding: 8px 0; }
+.srcs .sub.wait { color: var(--tint); }
+.srcs li > .sub { flex: none; padding: 0 12px; }
+.srcs button.small { flex: none; min-height: 44px; padding: 0 12px; border-radius: 22px; font-size: 15px; font-weight: 600; color: var(--tint); }
+.srcs button.small.add { color: var(--label); background: var(--sep); }
+.backlink { min-height: 44px; color: var(--tint); font-weight: 600; margin: -6px 0 4px -2px; }
+.bigbtn.danger { color: var(--down); }
 .faq h2 { font: 700 22px/1.2 var(--f-head); margin: 28px 0 6px; }
 .faq details { border-bottom: 0.5px solid var(--sep); }
 .faq summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 14px; min-height: 52px; padding: 10px 0; font-weight: 600; }
@@ -769,7 +781,8 @@ function closeReader(fromHistory) {
   if (r.hidden) return;
   r.classList.remove("open");
   document.body.style.overflow = "";
-  setTimeout(() => { r.hidden = true; $("rBody").replaceChildren(); }, reduceMotion ? 0 : 320);
+  // Skip the cleanup if a sheet was opened again before the slide-out finished.
+  setTimeout(() => { if (!r.classList.contains("open") && !panel) { r.hidden = true; $("rBody").replaceChildren(); } }, reduceMotion ? 0 : 320);
   if (!fromHistory && location.hash === "#read") history.back();
 }
 $("rClose").addEventListener("click", () => closeReader(false));
@@ -778,7 +791,10 @@ $("rBody").addEventListener("click", e => {
   const b = e.target.closest("[data-open]");
   if (b) openReader(+b.dataset.open, true);
 });
-addEventListener("popstate", () => { closeReader(true); if (location.hash !== "#" + panel) closePanel(true); });
+addEventListener("popstate", () => {
+  if (ownBack) { ownBack = false; return; }
+  closeReader(true); if (location.hash !== "#" + panel) closePanel(true);
+});
 addEventListener("keydown", e => { if (e.key === "Escape") { closeReader(false); closePanel(false); } });
 
 /* ---------- panels: account, shelves, help, sources ---------- */
@@ -796,12 +812,14 @@ function openPanel(name, html) {
   document.body.style.overflow = "hidden";
   history.pushState({ panel: name }, "", "#" + name);
 }
+// Our own history.back() lands later as a popstate; it must not close a sheet opened meanwhile.
+let ownBack = false;
 function closePanel(fromHistory) {
   if (!panel) return;
   panel = "";
   $("rActs").hidden = false;
   closeReader(true);
-  if (!fromHistory && location.hash.length > 1) history.back();
+  if (!fromHistory && location.hash.length > 1) { ownBack = true; history.back(); }
 }
 
 async function openSources() {
@@ -1274,7 +1292,7 @@ function openAccount() {
     <a class="bigbtn primary" href="/welcome#signup">Create a free account</a><a class="bigbtn" href="/welcome#signin">Sign in</a>
     <div class="sec">More</div>${menu([go("sources", "Sources"), go("help", "Help and FAQ"), `<li><a href="/privacy">Privacy</a></li>`, `<li><a href="/terms">Terms</a></li>`])}`);
   openPanel("account", `<h1>${esc(u.name || "Your account")}</h1><p class="lead">${esc(u.email)}</p>
-    <div class="sec">Reading</div>${menu([go("topics", "Shelves"), go("sources", "Sources")])}
+    <div class="sec">Reading</div>${menu([go("shelves", "Shelves"), go("sources", "Sources")])}
     <div class="sec">Help</div>${menu([go("help", "Help and FAQ"), `<li><a href="/privacy">Privacy</a></li>`, `<li><a href="/terms">Terms</a></li>`])}
     <div class="sec">Account</div>${menu([go("password", u.has_password ? "Change password" : "Set a password"), `<li><button data-act="signout">Sign out</button></li>`,
       `<li><button data-act="signout-all">Sign out everywhere</button></li>`, go("delete", "Delete account", "danger")])}`);
@@ -1284,7 +1302,7 @@ $("acctBtn").addEventListener("click", openAccount);
 // Shelves from suggested topics. First run (onboarding) and later additions use the same picker.
 async function openTopics(first) {
   openPanel("shelves", `<h1>${first ? "Pick your shelves" : "Shelves"}</h1>
-    <p class="lead">${first ? "Each shelf is a topic with sources already on it. Pick a few to start; you can change them any time." : "Add a topic as a new shelf. Each one comes with vetted sources."}</p>
+    ${first ? "" : `<button class="backlink" data-go="shelves">\u2039 Shelves</button>`}<p class="lead">${first ? "Each shelf is a topic with sources already on it. Pick a few to start; you can change them any time." : "Add a topic as a new shelf. Each one comes with vetted sources."}</p>
     <div class="pick" id="pick">Loading…</div><p class="ferr" id="pickErr" role="alert"></p>
     <button class="bigbtn primary" id="pickGo" disabled>${first ? "Start reading" : "Add shelves"}</button>
     ${first ? `<button class="bigbtn" id="pickSkip">Skip for now</button>` : ""}`);
@@ -1304,8 +1322,8 @@ async function openTopics(first) {
       const res = await api("shelves/topics", { topics: slugs });
       store.set("picked:" + me.user.id, true);
       setMe({ ...me, ...res });
-      closePanel(false);
-      toast(first ? "You're all set. Change your shelves any time from the account menu." : "Shelves added");
+      if (first) { closePanel(false); toast("You're all set. Change your shelves any time from the account menu."); }
+      else { openShelves(); toast("Shelves added"); }
     } catch (e) { $("pickErr").textContent = e.message; $("pickGo").disabled = false; }
   });
 }
@@ -1361,10 +1379,124 @@ async function signOut(all) {
 
 $("rBody").addEventListener("click", e => {
   const g = e.target.closest("[data-go]");
-  if (g) return ({ sources: openSources, help: openHelp, topics: () => openTopics(false), password: openPassword, delete: openDelete })[g.dataset.go]();
+  if (g) return ({ sources: openSources, help: openHelp, shelves: openShelves, topics: () => openTopics(false), password: openPassword, delete: openDelete })[g.dataset.go]();
   const a = e.target.closest("[data-act]");
   if (a?.dataset.act === "signout") signOut(false);
   if (a?.dataset.act === "signout-all") signOut(true);
+});
+
+/* ---------- shelves editor ---------- */
+const ICON_UPARROW = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>`;
+const ICON_DOWNARROW = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>`;
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+async function refreshMe() { setMe(await api("me")); }
+
+function openShelves() {
+  if (!me?.user) return openAccount();
+  const sh = me.shelves || [];
+  openPanel("shelves", `<h1>Shelves</h1>
+    <p class="lead">Your shelves are the tabs across the top. Tap one to rename it or change its sources.</p>
+    ${sh.length ? `<ul class="list shelves">${sh.map((x, i) => `<li>
+      <button class="sh-open" data-edit="${x.id}"><b>${esc(x.name)}</b><span>${plural(x.sources.length, "source")}${x.query ? ` · follows “${esc(x.query)}”` : ""}</span></button>
+      <button class="icon-btn" data-move="${x.id}" data-dir="-1" aria-label="Move ${esc(x.name)} up" ${i ? "" : "disabled"}>${ICON_UPARROW}</button>
+      <button class="icon-btn" data-move="${x.id}" data-dir="1" aria-label="Move ${esc(x.name)} down" ${i < sh.length - 1 ? "" : "disabled"}>${ICON_DOWNARROW}</button></li>`).join("")}</ul>`
+    : `<p class="lead">No shelves yet. Add one below.</p>`}
+    <div class="sec">Add a shelf</div>
+    <form id="nsForm"><label class="field"><span>Follow any topic</span><input id="nsName" maxlength="40" autocomplete="off" placeholder="Woodworking, Red Sox, heat pumps"></label>
+    <p class="ferr" id="nsErr" role="alert"></p><button class="bigbtn primary">Create shelf</button></form>
+    <button class="bigbtn" data-go="topics">Add a suggested topic</button>`);
+  $("nsForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const phrase = $("nsName").value.trim();
+    if (!phrase) { $("nsErr").textContent = "Type a topic, like woodworking or the Red Sox."; return; }
+    try {
+      const { id } = await api("shelves/save", { name: phrase[0].toUpperCase() + phrase.slice(1), query: phrase });
+      await refreshMe();
+      openShelf(id);
+      toast("Shelf created. Its first stories arrive within about 15 minutes.");
+    } catch (x) { $("nsErr").textContent = x.message; }
+  });
+}
+
+function srcRow(x, shelfId) {
+  const sub = x.status === "pending" ? `<span class="sub wait">Checking it can be read for free</span>`
+    : x.status === "rejected" ? `<span class="sub">${esc(x.note || "Could not be added")}</span>`
+    : `<span class="sub">${x.kind === "search" ? "Topic search" : esc((x.site_url || "").replace(/^https?:\/\/(www\.)?/, ""))}${x.access === "subscriber" ? " · Subscriber" : ""}</span>`;
+  return `<li><span class="txt"><b>${esc(x.name)}</b>${sub}</span><button class="small" data-unsrc="${x.id}" data-shelf="${shelfId}" aria-label="Remove ${esc(x.name)}">Remove</button></li>`;
+}
+function openShelf(id) {
+  const x = me?.shelves?.find(s => s.id === id);
+  if (!x) return openShelves();
+  openPanel("shelf", `<button class="backlink" data-go="shelves">‹ Shelves</button><h1>${esc(x.name)}</h1>
+    <form id="renForm"><label class="field"><span>Name</span><input id="renName" maxlength="40" value="${esc(x.name)}"></label></form>
+    <div class="sec">Sources</div><ul class="list srcs" id="shelfSrcs">${x.sources.map(s => srcRow(s, id)).join("") || `<li><span class="txt"><span class="sub">No sources yet. Add some below.</span></span></li>`}</ul>
+    <div class="sec">Add a source</div>
+    <label class="field"><span>Search, or paste a website, feed or YouTube channel</span><input id="srcQ" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="vtdigger, electrek.co, @veritasium"></label>
+    <p class="ferr" id="srcErr" role="alert"></p><ul class="list srcs" id="srcRes" hidden></ul>
+    <button class="bigbtn danger" id="delShelf">Remove this shelf</button>`);
+  $("shelfSrcs").dataset.shelf = id;
+  // Rename saves when you leave the field or press return.
+  const rename = async () => {
+    const n = $("renName").value.trim();
+    if (!n || n === x.name) return;
+    try { await api("shelves/save", { id, name: n }); await refreshMe(); document.querySelector("#rBody h1").textContent = n; toast("Renamed"); }
+    catch (e) { $("srcErr").textContent = e.message; }
+  };
+  $("renName").addEventListener("change", rename);
+  $("renForm").addEventListener("submit", e => { e.preventDefault(); $("renName").blur(); });
+  let t, seq = 0;
+  $("srcQ").addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => searchSources(id, ++seq, () => seq), 250); });
+  $("delShelf").addEventListener("click", async e => {
+    const b = e.currentTarget;
+    if (!b.dataset.sure) { b.dataset.sure = 1; b.textContent = "Tap again to remove"; return; }
+    try { await api("shelves/remove", { id }); await refreshMe(); openShelves(); toast(`Removed ${x.name}`); }
+    catch (er) { $("srcErr").textContent = er.message; }
+  });
+}
+const looksLikeUrl = q => /^@[\w.-]{2,}$/.test(q) || (/^\S+\.[a-z]{2,}(\/\S*)?$/i.test(q) && !/\s/.test(q));
+async function searchSources(shelfId, mine, latest) {
+  const q = $("srcQ").value.trim(), box = $("srcRes");
+  $("srcErr").textContent = "";
+  if (q.length < 2) { box.hidden = true; return; }
+  const have = new Set(me.shelves.find(s => s.id === shelfId)?.sources.map(s => s.id));
+  const safe = q.replace(/[^\w .@-]/g, " ").trim().replace(/\s+/g, "*");
+  let rows = [];
+  if (safe) try { rows = await sb(`tangent_sources?select=id,name,kind,site_url,access&status=eq.active&enabled=eq.true&or=(name.ilike.${encodeURIComponent(`"*${safe}*"`)},site_url.ilike.${encodeURIComponent(`"*${safe}*"`)})&order=name&limit=8`); } catch {}
+  if (mine !== latest()) return; // a newer keystroke already searched
+  const out = rows.map(r => `<li><span class="txt"><b>${esc(r.name)}</b><span class="sub">${esc(KIND_LABEL[r.kind] || "News")} · ${esc(r.site_url.replace(/^https?:\/\/(www\.)?/, ""))}</span></span>${have.has(r.id) ? `<span class="sub">Added</span>` : `<button class="small add" data-addsrc="${r.id}">Add</button>`}</li>`);
+  if (looksLikeUrl(q)) out.unshift(`<li><span class="txt"><b>${esc(q)}</b><span class="sub">Add this site. Tangent checks it first.</span></span><button class="small add" data-req="url">Add</button></li>`);
+  else out.push(`<li><span class="txt"><b>“${esc(q)}” in the news</b><span class="sub">Follow this phrase across news sites</span></span><button class="small add" data-req="query">Follow</button></li>`);
+  box.innerHTML = out.join(""); box.hidden = false;
+}
+$("rBody").addEventListener("click", async e => {
+  const t = e.target.closest("[data-edit],[data-move],[data-unsrc],[data-addsrc],[data-req]");
+  if (!t) return;
+  if (t.dataset.edit) return openShelf(+t.dataset.edit);
+  if (t.dataset.move) {
+    const ids = me.shelves.map(s => s.id), i = ids.indexOf(+t.dataset.move), j = i + +t.dataset.dir;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    setMe({ ...me, shelves: ids.map(id => me.shelves.find(s => s.id === id)) });
+    openShelves();
+    document.querySelector(`[data-move="${ids[j]}"][data-dir="${t.dataset.dir}"]:not(:disabled)`)?.focus();
+    try { await api("shelves/order", { ids }); } catch (x) { toast(x.message); refreshMe(); }
+    return;
+  }
+  const shelf = +$("shelfSrcs")?.dataset.shelf;
+  if (!shelf) return;
+  t.disabled = true;
+  try {
+    if (t.dataset.unsrc) await api("shelves/source", { shelf, source: +t.dataset.unsrc, add: false });
+    if (t.dataset.addsrc) await api("shelves/source", { shelf, source: +t.dataset.addsrc, add: true });
+    if (t.dataset.req) {
+      const q = $("srcQ").value.trim();
+      await api("shelves/request", t.dataset.req === "url" ? { shelf, url: q } : { shelf, query: q });
+      $("srcQ").value = ""; $("srcRes").hidden = true;
+    }
+    await refreshMe();
+    const x = me.shelves.find(s => s.id === shelf);
+    $("shelfSrcs").innerHTML = x.sources.map(s => srcRow(s, shelf)).join("") || `<li><span class="txt"><span class="sub">No sources yet. Add some below.</span></span></li>`;
+    if (t.dataset.addsrc) { t.replaceWith(Object.assign(document.createElement("span"), { className: "sub", textContent: "Added" })); }
+  } catch (x) { $("srcErr").textContent = x.message; t.disabled = false; }
 });
 
 /* ---------- load ---------- */

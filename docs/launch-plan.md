@@ -33,12 +33,18 @@ non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
       password change, account deletion, rate limiting. Unit tests for cookie signing and input validation.
 - [x] 5. App: professional public landing page (hero, how it works, features, screenshots, FAQ, footer with privacy/terms/help), sign-in/sign-up sheet, onboarding (pick suggested topics), signed-in feed per shelf.
 - [x] 5b. Help: public help page (/help) with full FAQ, and an in-app Help and FAQ section in the account menu.
-- [ ] 6. Shelves editor: add, rename, reorder, delete shelves; add or remove sources per shelf; search the catalog;
+- [x] 6. Shelves editor: add, rename, reorder, delete shelves; add or remove sources per shelf; search the catalog;
       paste any URL or YouTube channel; create a topic shelf from a phrase.
 - [ ] 7. Source requests and discovery: pasted URLs and topic phrases are vetted by the fetcher job (feed found,
       fresh, free, readable) and join the catalog; background discovery per shelf topic, suggestions shown per shelf.
 - [ ] 8. Per-user feedback and learned ranking (move from owner key to accounts); per-user sports teams and stock tickers.
-- [ ] 9. Admin: Jason can remove or disable any source, see user and source counts, retire the owner-key link.
+- [ ] 9. Admin dashboard (Jason asked 2026-10-18): an admin-only page in the app listing users (email, name, sign-in method,
+      joined, last seen, shelves, sources added, votes, status) with search; stats (total and active users by day/week,
+      sign-ups over time, sessions, votes, hides, source requests, fetch health); robust logging: a `tangent_events_log`
+      table written by the API for sign-ups, sign-ins (success and failure, with IP and user agent), sign-outs, password
+      changes, account deletions, shelf and source changes, rate-limit hits and server errors, plus fetcher runs; viewable
+      and filterable in the dashboard, kept 180 days. Admin actions: disable a user, end their sessions, disable or
+      remove any source. Retire the owner-key link once Jason's account is admin.
 - [ ] 10. Housekeeping for a public app: privacy policy, terms, account deletion, data retention (drop article bodies
       after 21 days, articles after 60) to stay inside the free database, security review of the new endpoints.
 - [ ] 11. Domain: tangentreads.com and www attached and live (done 2026-10-18). Remaining: redirect www and tangent.szumlanski.com to tangentreads.com after accounts ship (the owner key is stored per address).
@@ -59,3 +65,4 @@ non-`tangent_` objects in the database. Keep API cost near zero (see CLAUDE.md).
 - 2026-10-18 item 4: /api/v1 router (lib/server.js + functions/api/v1/[[path]].js): email sign-up/in/out, Google code flow with PKCE (live once Jason adds GOOGLE_CLIENT_ID/SECRET), sessions as HMAC-signed HttpOnly cookies, rate limits per IP and per email, same-origin check on POSTs, shelves, feedback, settings, password change, delete, owner claim. 4 unit tests; 22-step end-to-end run against the real database passed.
 - 2026-10-18 Jason: hide used an x on cards but a crossed-out eye in the reader; same action, now the eye everywhere.
 - 2026-10-18 items 5 and 5b: /welcome landing (hero, how it works, features, real screenshots with publisher photos swapped for color fields, FAQ, footer), /help full FAQ (also loaded into the in-app Help sheet), /privacy, /terms. App: signed-out visitors go to /welcome (tg_in readable cookie, tg_guest for look-around), account menu replaces the Sources button (shelves picker, sources, help, password, sign out, sign out everywhere, delete), onboarding topic picker, tabs and loading per shelf, votes saved per account, owner key claims admin on sign-in. SW no longer serves the app for other pages. Playwright e2e against the real API and database: sign up, pick shelves, vote, help, sign out everywhere, sign in, delete: all pass, zero unexpected console errors, no sideways scroll at 390 light/dark and 1280.
+- 2026-10-18 item 6: shelves editor in the account menu: reorder (up/down), new shelf from any phrase (adds a Google News search source), per-shelf rename, sources list, catalog search, paste a site/feed/YouTube channel/@handle (stored pending until item 7's vetting turns it on), remove source, remove shelf. New DB functions tangent_order_shelves and tangent_request_source (0012); API routes shelves/order and shelves/request with address checks (no local or private hosts) and 40/day per user. Fixed two sheet bugs (a quick reopen got blanked or closed). Playwright e2e passed at 390 light, 390 dark and 1280. Closed 7 leftover test accounts.

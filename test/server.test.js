@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sign, unsign, checkSignup, readCookie, cookieHeader, sameOrigin, json, signOutCookies } from "../lib/server.js";
+import { sign, unsign, checkSignup, readCookie, cookieHeader, sameOrigin, json, signOutCookies, sourceUrl } from "../lib/server.js";
 
 test("session cookie signature round-trips and rejects tampering", async () => {
   const s = await sign("570253a9-52d9-42f4-94f6-76444ad69918", "k1");
@@ -39,4 +39,13 @@ test("json() sends every set-cookie line", () => {
   assert.equal(lines.length, 2);
   assert.ok(lines[0].startsWith("tg_sid=;") && lines[0].includes("HttpOnly"));
   assert.ok(lines[1].startsWith("tg_in=;") && !lines[1].includes("HttpOnly"));
+});
+
+test("pasted source addresses", () => {
+  assert.equal(sourceUrl("example.com"), "https://example.com");
+  assert.equal(sourceUrl("https://www.vtdigger.org/feed/"), "https://www.vtdigger.org/feed");
+  assert.equal(sourceUrl("@veritasium"), "https://www.youtube.com/@veritasium");
+  assert.equal(sourceUrl("https://www.youtube.com/channel/UCabcDEF#x"), "https://www.youtube.com/channel/UCabcDEF");
+  for (const bad of ["", "not a url", "javascript:alert(1)", "ftp://x.com", "http://localhost", "http://127.0.0.1", "http://10.0.0.5/x", "http://[::1]/", "http://x.com:8080", "http://u:p@x.com", "http://printer.local", "intranet"])
+    assert.equal(sourceUrl(bad), null, bad);
 });
