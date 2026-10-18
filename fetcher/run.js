@@ -108,6 +108,10 @@ async function processSourceInner(source) {
         }
       }
       row.title = plain(row.title);
+      // A blank headline arrives as just the outlet name ("- Lonely Planet"); try the page title instead.
+      const bare = t => (t || "").toLowerCase().replace(source.name.toLowerCase(), "").replace(/[^a-z0-9]/g, "");
+      if (bare(row.title).length < 8) row.title = plain(ex?.title || "");
+      if (bare(row.title).length < 8) continue;
       row.excerpt = plain(row.excerpt)?.slice(0, 400) || null;
       if (!row.title) continue;
       rows.push(row);
