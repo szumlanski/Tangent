@@ -83,7 +83,9 @@ a { color: inherit; }
 .meta b { font-weight: 600; color: var(--label); overflow: hidden; text-overflow: ellipsis; }
 .meta .k { color: var(--tint); font-weight: 600; }
 .card h3 { margin: 0; font: 700 20px/1.2 var(--f-head); letter-spacing: -0.01em; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
-.card p { margin: 0; font-size: 15px; line-height: 1.4; color: var(--label-2); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.card p { margin: 0; font-size: 15px; line-height: 1.4; color: var(--label-2); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; min-height: 0; }
+/* Headlines and the outlet line never shrink; only the teaser gives way (fitText trims it to whole lines). */
+.card .meta, .card h3 { flex-shrink: 0; }
 .card.big h3 { font-size: 28px; -webkit-line-clamp: 4; }
 .card.noimg { background: var(--card); }
 .card.noimg .txt { flex: 1; justify-content: flex-start; }
@@ -347,6 +349,16 @@ details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; m
 .backlink { min-height: 44px; color: var(--tint); font-weight: 600; margin: -6px 0 4px -2px; }
 .bigbtn.danger { color: var(--down); }
 .faq h2 { font: 700 22px/1.2 var(--f-head); margin: 28px 0 6px; }
+.installbar { position: fixed; left: 12px; right: 12px; bottom: calc(var(--tabbar) + 12px); z-index: 45; display: grid; grid-template-columns: 48px 1fr; gap: 4px 12px; align-items: center;
+  background: var(--card); color: var(--label); border: 1px solid var(--sep); border-radius: 18px; padding: 14px; box-shadow: 0 10px 30px var(--shade); max-width: 480px; margin: 0 auto; }
+.installbar img { width: 48px; height: 48px; border-radius: 11px; grid-row: span 2; }
+.installbar b { font-size: 17px; }
+.installbar span { font-size: 15px; color: var(--label-2); }
+.installbar .row { grid-column: 1 / -1; display: flex; gap: 8px; margin-top: 8px; }
+.installbar .row button { flex: 1; min-height: 44px; border-radius: 12px; font-weight: 600; font-size: 16px; background: var(--sep); }
+.installbar .row button.go { background: var(--label); color: var(--bg); }
+@media (min-width: 900px) { .installbar { bottom: 20px; left: auto; right: 20px; width: 420px; } }
+.howto ol { padding-left: 22px; } .howto li { margin: 0 0 12px; } .howto svg { width: 20px; height: 20px; vertical-align: -4px; color: var(--tint); }
 .invite { margin: 32px 0 8px; padding: 18px 18px 8px; border-radius: 14px; background: var(--card); border: 1px solid var(--sep); }
 .invite b { font: 700 19px/1.3 var(--f-head); }
 .invite p { color: var(--label-2); margin: 8px 0 14px; font-size: 16px; }
@@ -688,6 +700,21 @@ function go(dir) {
 })();
 
 /* ---------- desktop grid ---------- */
+// A short card squeezes its teaser; keep only the whole lines that fit, or drop it, so text never overlaps.
+function fitText(root) {
+  for (const p of root.querySelectorAll(".card p")) {
+    p.style.webkitLineClamp = ""; p.style.height = ""; p.style.display = "";
+    if (p.scrollHeight - p.clientHeight <= 2) continue;
+    const lh = parseFloat(getComputedStyle(p).lineHeight) || 21;
+    const lines = Math.floor((p.clientHeight + 1) / lh);
+    if (lines < 1) { p.style.display = "none"; continue; }
+    p.style.webkitLineClamp = lines; p.style.height = lines * lh + "px";
+  }
+}
+const fitSoon = el => requestAnimationFrame(() => fitText(el));
+new MutationObserver(() => fitSoon($("stage"))).observe($("stage"), { childList: true });
+new MutationObserver(() => fitSoon($("grid"))).observe($("grid"), { childList: true });
+addEventListener("resize", () => { fitSoon($("grid")); fitSoon($("stage")); });
 function renderGrid(list) {
   const shapes = ["big", "", "", "tall", "", "wide", "", "", "", "wide", "tall", ""];
   $("grid").innerHTML = (showTrends() ? trendHTML() : "") + list.map((it, i) => {
@@ -834,6 +861,7 @@ async function openReader(id, swap = false) {
 function closeReader(fromHistory) {
   const r = $("reader");
   if (r.hidden) return;
+  if (!panel && ++storiesRead >= 1) setTimeout(installBar, 600);
   r.classList.remove("open");
   document.body.style.overflow = "";
   // Skip the cleanup if a sheet was opened again before the slide-out finished.
@@ -1361,7 +1389,7 @@ function openAccount() {
   if (!u) return openPanel("account", `<h1>Tangent</h1>
     <p class="lead">You are looking around without an account. Create one to choose your own shelves and sources, and keep your votes on every device. It is free.</p>
     <a class="bigbtn primary" href="/welcome#signup">Create a free account</a><a class="bigbtn" href="/welcome#signin">Sign in</a>
-    <div class="sec">More</div>${menu([go("alerts", "Alerts"), go("sources", "Sources"), go("help", "Help and FAQ"), `<li><a href="/privacy">Privacy</a></li>`, `<li><a href="/terms">Terms</a></li>`])}`);
+    <div class="sec">More</div>${menu([...(canPrompt() ? [go("install", "Install the app")] : []), go("alerts", "Alerts"), go("sources", "Sources"), go("help", "Help and FAQ"), `<li><a href="/privacy">Privacy</a></li>`, `<li><a href="/terms">Terms</a></li>`])}`);
   const ps = me.personas || [];
   openPanel("account", `<h1>${esc(u.name || "Your account")}</h1><p class="lead">${esc(u.email)}</p>
     <div class="sec">Reading as</div>
@@ -1369,7 +1397,7 @@ function openAccount() {
       ${ps.length < 8 ? `<button data-go="newpersona" aria-label="Add a persona"><span class="pav add" aria-hidden="true">+</span><span>Add</span></button>` : ""}</div>
     <div class="sec">${esc(curPersona()?.name || "This persona")}</div>${menu([go("persona", "Name and picture"), go("shelves", "Shelves"), go("alerts", "Alerts"), go("sources", "Sources")])}
     ${u.is_admin ? `<div class="sec">Admin</div>${menu([`<li><a href="/admin">Admin dashboard</a></li>`])}` : ""}
-    <div class="sec">Help</div>${menu([go("help", "Help and FAQ"), `<li><a href="/privacy">Privacy</a></li>`, `<li><a href="/terms">Terms</a></li>`])}
+    <div class="sec">Help</div>${menu([...(canPrompt() ? [go("install", "Install the app")] : []), go("help", "Help and FAQ"), `<li><a href="/privacy">Privacy</a></li>`, `<li><a href="/terms">Terms</a></li>`])}
     <div class="sec">Account</div>${menu([go("password", u.has_password ? "Change password" : "Set a password"), `<li><button data-act="signout">Sign out</button></li>`,
       `<li><button data-act="signout-all">Sign out everywhere</button></li>`, go("delete", "Delete account", "danger")])}`);
 }
@@ -1458,7 +1486,7 @@ async function signOut(all) {
 
 $("rBody").addEventListener("click", e => {
   const g = e.target.closest("[data-go]");
-  if (g) return ({ persona: () => openPersona(me.persona), newpersona: () => openPersona(null), sources: openSources, help: openHelp, shelves: openShelves, alerts: openAlerts, topics: () => openTopics(false), password: openPassword, delete: openDelete })[g.dataset.go]();
+  if (g) return ({ install: installApp, persona: () => openPersona(me.persona), newpersona: () => openPersona(null), sources: openSources, help: openHelp, shelves: openShelves, alerts: openAlerts, topics: () => openTopics(false), password: openPassword, delete: openDelete })[g.dataset.go]();
   const a = e.target.closest("[data-act]");
   if (a?.dataset.act === "signout") signOut(false);
   if (a?.dataset.act === "signout-all") signOut(true);
@@ -1955,6 +1983,42 @@ $("rBody").addEventListener("click", async e => {
 });
 // Leaving an editor rebuilds whichever tab is showing.
 const rebuildViews = () => { if (view === "stocks") renderStocks(); if (view === "sports") renderSports(); };
+
+/* ---------- install prompt ---------- */
+// Tangent works best installed (full screen, offline, notifications). Ask after the reader has had a
+// look: once they open a story or spend 30 seconds. "Not now" waits 3 days; after 5 no-thanks it stops.
+const standaloneNow = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+let installEvent = null;
+const nag = () => store.get("installNag", { n: 0, until: 0 });
+const canPrompt = () => !standaloneNow() && (installEvent || (isIOS && /Safari/.test(navigator.userAgent)));
+function installBar() {
+  if (!canPrompt() || $("installBar") || !$("reader").hidden) return;
+  const st = nag();
+  if (st.done || st.n >= 5 || Date.now() < st.until) return;
+  document.body.insertAdjacentHTML("beforeend", `<div class="installbar" id="installBar" role="dialog" aria-label="Install Tangent">
+    <img src="app-icon-v2-192.png" alt=""><b>Get the Tangent app</b><span>Opens full screen, works offline and can send you alerts. Free, no app store.</span>
+    <div class="row"><button id="instLater">Not now</button><button class="go" id="instGo">${installEvent ? "Install" : "Show me how"}</button></div></div>`);
+  $("instLater").addEventListener("click", () => { store.set("installNag", { n: nag().n + 1, until: Date.now() + 3 * 864e5 }); $("installBar").remove(); });
+  $("instGo").addEventListener("click", () => { $("installBar").remove(); installApp(); });
+}
+async function installApp() {
+  if (installEvent) {
+    installEvent.prompt();
+    const { outcome } = await installEvent.userChoice.catch(() => ({}));
+    installEvent = null;
+    if (outcome !== "accepted") store.set("installNag", { n: nag().n + 1, until: Date.now() + 3 * 864e5 });
+    return;
+  }
+  // iPhone and iPad: Safari has no install button, so show the two taps.
+  openPanel("install", `<h1>Add Tangent to your Home Screen</h1><div class="howto"><ol>
+    <li>Tap the Share button <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg> at the bottom of Safari (top right on iPad).</li>
+    <li>Scroll down and tap <b>Add to Home Screen</b>, then <b>Add</b>.</li>
+    <li>Open Tangent from its new icon. If you have an account, sign in there once (the Home Screen app keeps its own sign-in), then turn on alerts from the menu.</li></ol></div>`);
+}
+addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvent = e; });
+addEventListener("appinstalled", () => { store.set("installNag", { ...nag(), done: true }); $("installBar")?.remove(); toast("Tangent is installed. Open it from your home screen."); });
+setTimeout(installBar, 30e3);
+let storiesRead = 0;
 
 /* ---------- load ---------- */
 async function load() {
