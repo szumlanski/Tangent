@@ -83,3 +83,28 @@ export const updateCluster = (id, patch) =>
 export const clustersToSummarize = lim => DRY ? [] : rest("rpc/tangent_clusters_to_summarize", { method: "POST", body: { lim } });
 export const clusterMembers = id =>
   rest(`tangent_articles?select=title,excerpt,body_html,extracted,kind,tangent_sources(name)&cluster_id=eq.${id}&paywalled=is.false&order=extracted.desc,published_at.desc&limit=6`);
+
+// ---- push alerts (service key only: these tables have no API policies) ----
+const inList = ids => `(${ids.join(",")})`;
+export async function config(keys) {
+  if (DRY) return {};
+  const rows = await rest(`tangent_config?k=in.${inList(keys)}&select=k,v`);
+  return Object.fromEntries(rows.map(r => [r.k, r.v]));
+}
+export const setConfig = (k, v) => rest("tangent_config?on_conflict=k", { method: "POST", body: [{ k, v }], prefer: "resolution=merge-duplicates,return=minimal" });
+export const pushSubs = async () => DRY ? [] : rest("tangent_push_subs?disabled_at=is.null&select=id,user_id,endpoint,p256dh,auth,tz");
+export const newArticles = async (cursor, since) => (await rest(
+  `tangent_articles?select=id,title,excerpt,source_id,cluster_id,published_at,fetched_at,tangent_sources!inner(name)` +
+  `&paywalled=is.false&tangent_sources.enabled=is.true&fetched_at=gt.${encodeURIComponent(cursor)}&published_at=gt.${encodeURIComponent(since)}&order=fetched_at.asc&limit=1000`))
+  .map(({ tangent_sources, ...a }) => ({ ...a, source_name: tangent_sources?.name || "" }));
+export const storyMembers = ids =>
+  rest(`tangent_feed?cluster_id=in.${inList(ids)}&select=id,title,source_id,source_name,cluster_id,published_at,image,story_headline&limit=3000`);
+export const activeAlerts = ids => rest(`tangent_alerts?removed_at=is.null&enabled=is.true&user_id=in.${inList(ids)}&select=id,user_id,kind,phrase,shelf_id,source_id`);
+export const usersById = ids => rest(`tangent_users?id=in.${inList(ids)}&deleted_at=is.null&select=id,settings`);
+export const shelfSources = async ids => (await rest(
+  `tangent_shelf_sources?removed_at=is.null&select=shelf_id,source_id,tangent_shelves!inner(user_id,name)` +
+  `&tangent_shelves.user_id=in.${inList(ids)}&tangent_shelves.removed_at=is.null`))
+  .map(r => ({ shelf_id: r.shelf_id, source_id: r.source_id, user_id: r.tangent_shelves.user_id, name: r.tangent_shelves.name }));
+export const recentSent = (ids, since) => rest(`tangent_alert_sent?user_id=in.${inList(ids)}&sent_at=gt.${encodeURIComponent(since)}&select=user_id,key,kind,alert_id,sent_at`);
+export const markSub = (id, patch) => rest(`tangent_push_subs?id=eq.${id}`, { method: "PATCH", body: patch, prefer: "return=minimal" });
+export const recordSent = row => rest("tangent_alert_sent?on_conflict=user_id,key", { method: "POST", body: [row], prefer: "resolution=ignore-duplicates,return=minimal" });

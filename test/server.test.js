@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sign, unsign, checkSignup, readCookie, cookieHeader, sameOrigin, json, signOutCookies, sourceUrl } from "../lib/server.js";
+import { sign, unsign, checkSignup, readCookie, cookieHeader, sameOrigin, json, signOutCookies, sourceUrl, pushSub } from "../lib/server.js";
 
 test("session cookie signature round-trips and rejects tampering", async () => {
   const s = await sign("570253a9-52d9-42f4-94f6-76444ad69918", "k1");
@@ -49,4 +49,14 @@ test("pasted source addresses", () => {
   assert.equal(sourceUrl("https://www.youtube.com/channel/UCabcDEF#x"), "https://www.youtube.com/channel/UCabcDEF");
   for (const bad of ["", "not a url", "javascript:alert(1)", "ftp://x.com", "http://localhost", "http://127.0.0.1", "http://10.0.0.5/x", "http://[::1]/", "http://x.com:8080", "http://u:p@x.com", "http://printer.local", "intranet"])
     assert.equal(sourceUrl(bad), null, bad);
+});
+
+test("push subscriptions must point at a browser push service", () => {
+  const keys = { p256dh: "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM", auth: "tBHItJI5svbpez7KI4CCXg" };
+  assert.ok(pushSub({ endpoint: "https://fcm.googleapis.com/fcm/send/abc", keys }));
+  assert.ok(pushSub({ endpoint: "https://web.push.apple.com/QGx", keys }));
+  assert.equal(pushSub({ endpoint: "https://evil.example/x", keys }), null);
+  assert.equal(pushSub({ endpoint: "http://fcm.googleapis.com/x", keys }), null);
+  assert.equal(pushSub({ endpoint: "https://fcm.googleapis.com.evil.example/x", keys }), null);
+  assert.equal(pushSub({ endpoint: "https://fcm.googleapis.com/x", keys: { p256dh: "x", auth: "y" } }), null);
 });

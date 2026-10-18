@@ -9,6 +9,7 @@ import { isBlockedDomain } from "./paywall.js";
 import * as db from "./db.js";
 import { collectTrends } from "./trends.js";
 import { stories } from "./stories.js";
+import { alerts } from "./alerts.js";
 
 const STRATEGIES = { rss, gnews, sitemap, scrape };
 // News goes stale fast; videos and blogs post less often.
@@ -168,6 +169,9 @@ await trends;
 for (const r of results) console.log(r.error instanceof Error ? `ERR ${r.error.message}` : JSON.stringify(r));
 // Group new articles into stories and summarize them (needs ANTHROPIC_API_KEY).
 await stories().catch(e => console.warn("stories:", e.message));
+
+// Push alerts for what just arrived (local matching, no AI).
+await alerts().catch(e => console.warn("alerts:", e.message));
 
 if (process.env.DRY === "1") {
   const rows = db.dryRows;

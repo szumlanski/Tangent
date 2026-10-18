@@ -308,8 +308,22 @@ details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; m
 .srcs .txt { flex: 1; min-width: 0; display: grid; gap: 2px; padding: 8px 0; }
 .srcs .sub.wait { color: var(--tint); }
 .srcs li > .sub { flex: none; padding: 0 12px; }
+#alertList .sub { white-space: normal; }
 .srcs button.small { flex: none; min-height: 44px; padding: 0 12px; border-radius: 22px; font-size: 15px; font-weight: 600; color: var(--tint); }
 .srcs button.small.add { color: var(--label); background: var(--sep); }
+.switch { flex: none; width: 51px; height: 31px; border-radius: 16px; background: var(--sep); position: relative; margin: 6px 8px 6px 0; transition: background .2s; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.25); transition: transform .2s; }
+.switch[aria-checked="true"] { background: var(--up); }
+.switch[aria-checked="true"]::after { transform: translateX(20px); }
+.field select { width: 100%; min-height: 48px; border-radius: 10px; border: 1px solid var(--sep); background: var(--card); color: var(--label); font: 400 17px var(--f-ui); padding: 0 12px; }
+.inline { display: flex; gap: 8px; align-items: flex-end; }
+.inline .field { flex: 1; margin: 0; }
+.inline .bigbtn { width: auto; padding: 0 18px; margin: 0; flex: none; }
+.pushbox { background: var(--card); border-radius: 12px; padding: 14px 16px; margin: 0 0 8px; }
+.pushbox p { margin: 0 0 10px; }
+.pushbox .bigbtn { margin: 0; }
+.pushbox .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.pushbox .row .bigbtn { flex: 1 1 140px; }
 .backlink { min-height: 44px; color: var(--tint); font-weight: 600; margin: -6px 0 4px -2px; }
 .bigbtn.danger { color: var(--down); }
 .faq h2 { font: 700 22px/1.2 var(--f-head); margin: 28px 0 6px; }
@@ -1292,7 +1306,7 @@ function openAccount() {
     <a class="bigbtn primary" href="/welcome#signup">Create a free account</a><a class="bigbtn" href="/welcome#signin">Sign in</a>
     <div class="sec">More</div>${menu([go("sources", "Sources"), go("help", "Help and FAQ"), `<li><a href="/privacy">Privacy</a></li>`, `<li><a href="/terms">Terms</a></li>`])}`);
   openPanel("account", `<h1>${esc(u.name || "Your account")}</h1><p class="lead">${esc(u.email)}</p>
-    <div class="sec">Reading</div>${menu([go("shelves", "Shelves"), go("sources", "Sources")])}
+    <div class="sec">Reading</div>${menu([go("shelves", "Shelves"), go("alerts", "Alerts"), go("sources", "Sources")])}
     <div class="sec">Help</div>${menu([go("help", "Help and FAQ"), `<li><a href="/privacy">Privacy</a></li>`, `<li><a href="/terms">Terms</a></li>`])}
     <div class="sec">Account</div>${menu([go("password", u.has_password ? "Change password" : "Set a password"), `<li><button data-act="signout">Sign out</button></li>`,
       `<li><button data-act="signout-all">Sign out everywhere</button></li>`, go("delete", "Delete account", "danger")])}`);
@@ -1379,7 +1393,7 @@ async function signOut(all) {
 
 $("rBody").addEventListener("click", e => {
   const g = e.target.closest("[data-go]");
-  if (g) return ({ sources: openSources, help: openHelp, shelves: openShelves, topics: () => openTopics(false), password: openPassword, delete: openDelete })[g.dataset.go]();
+  if (g) return ({ sources: openSources, help: openHelp, shelves: openShelves, alerts: openAlerts, topics: () => openTopics(false), password: openPassword, delete: openDelete })[g.dataset.go]();
   const a = e.target.closest("[data-act]");
   if (a?.dataset.act === "signout") signOut(false);
   if (a?.dataset.act === "signout-all") signOut(true);
@@ -1499,6 +1513,123 @@ $("rBody").addEventListener("click", async e => {
   } catch (x) { $("srcErr").textContent = x.message; t.disabled = false; }
 });
 
+/* ---------- alerts and push notifications ---------- */
+// The private half of this key is only in the database, read by the fetcher that sends the pushes.
+const VAPID_PUBLIC = "BKu1JOaawoj4cdwJ2sD3D-MGJgtypNP7m7lojZhQORD_NEfID8CJYkSwfe-YQ6b_VTtyw9iBBn0tQSWd25Kznlc";
+const QUIET = [["22,7", "10 pm to 7 am"], ["23,6", "11 pm to 6 am"], ["21,8", "9 pm to 8 am"], ["0,0", "Off"]];
+const MAXES = [3, 5, 10, 20];
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+const b64key = s => Uint8Array.from(atob((s + "===".slice((s.length + 3) % 4)).replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0));
+let alertData = null;
+
+async function pushState() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window))
+    return isIOS && !standalone ? "ios" : "unsupported";
+  if (Notification.permission === "denied") return "denied";
+  const reg = await navigator.serviceWorker.getRegistration();
+  const sub = reg && await reg.pushManager.getSubscription();
+  return sub ? "on" : "off";
+}
+async function renderPushBox() {
+  const st = await pushState(), box = $("pushBox");
+  if (!box) return;
+  box.innerHTML = {
+    ios: `<p>On iPhone and iPad, alerts work once Tangent is on your Home Screen. Tap Share, then Add to Home Screen, then open Tangent from there and come back here.</p>`,
+    unsupported: `<p>This browser can't show notifications. Try Chrome, Edge, Firefox or Safari.</p>`,
+    denied: `<p>Notifications are blocked for Tangent. Allow them in your browser or phone settings, then come back here.</p>`,
+    off: `<p>Get a notification on this device when an alert below matches.</p><button class="bigbtn primary" data-push="on">Turn on notifications</button>`,
+    on: `<p>Notifications are on for this device.</p><div class="row"><button class="bigbtn" data-push="test">Send a test</button><button class="bigbtn" data-push="off">Turn off here</button></div>`,
+  }[st];
+}
+async function pushToggle(what) {
+  const reg = await navigator.serviceWorker.ready;
+  if (what === "test") return reg.showNotification("Tangent alerts are working", { body: "This is how a big story or one of your alerts will look.", icon: "app-icon-v2-192.png", tag: "test" });
+  if (what === "off") {
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) { await api("push/unsubscribe", { endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe(); }
+    return renderPushBox();
+  }
+  if (await Notification.requestPermission() !== "granted") return renderPushBox();
+  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64key(VAPID_PUBLIC) });
+  await api("push/subscribe", { subscription: sub.toJSON(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone });
+  alertData = await api("alerts");
+  renderAlertList(); renderPushBox();
+  toast("Notifications on. Big stories are on by default.");
+}
+
+function alertLabel(a) {
+  if (a.kind === "big") return ["Big stories", "When 4 or more outlets cover a story on your shelves"];
+  if (a.kind === "keyword") return [`“${a.phrase}”`, "Any headline or teaser that mentions it"];
+  if (a.kind === "shelf") return [me.shelves.find(s => s.id === a.shelf)?.name || "A removed shelf", "New stories on this shelf, at most hourly"];
+  return [a.source_name || "Source", "Every new story from this source"];
+}
+function renderAlertList() {
+  const box = $("alertList");
+  if (!box || !alertData) return;
+  const rows = alertData.alerts.map(a => {
+    const [t, sub] = alertLabel(a);
+    return `<li><span class="txt"><b>${esc(t)}</b><span class="sub">${esc(sub)}</span></span>${a.kind === "big" ? "" : `<button class="small" data-alert-rm="${a.id}" aria-label="Remove alert ${esc(t)}">Remove</button>`}<button class="switch" role="switch" aria-checked="${a.enabled}" data-alert-on="${a.id}" aria-label="${esc(t)}"></button></li>`;
+  });
+  if (!alertData.alerts.some(a => a.kind === "big")) rows.unshift(`<li><span class="txt"><b>Big stories</b><span class="sub">When 4 or more outlets cover a story on your shelves</span></span><button class="switch" role="switch" aria-checked="false" data-alert-big aria-label="Big stories"></button></li>`);
+  box.innerHTML = rows.join("");
+  $("recentAlerts").innerHTML = alertData.recent.length ? alertData.recent.map(r => `<li><span class="txt"><b>${esc(r.title || "")}</b><span class="sub">${ago(r.at)} ago</span></span></li>`).join("") : `<li><span class="txt"><span class="sub">Nothing sent yet.</span></span></li>`;
+}
+async function openAlerts() {
+  if (!me?.user) return openAccount();
+  const prefs = { max: 10, quiet: [22, 7], ...(me.user.settings?.alerts || {}) };
+  const sources = [...new Map(me.shelves.flatMap(s => s.sources).filter(s => s.status === "active").map(s => [s.id, s])).values()].sort((a, b) => a.name.localeCompare(b.name));
+  openPanel("alerts", `<h1>Alerts</h1>
+    <p class="lead">Tangent can tell you when a big story breaks, or when something you follow shows up. Alerts are checked every 15 minutes.</p>
+    <div class="pushbox" id="pushBox">Checking this device…</div>
+    <div class="sec">Alert me about</div><ul class="list srcs" id="alertList"><li><span class="txt"><span class="sub">Loading…</span></span></li></ul>
+    <div class="sec">Add an alert</div>
+    <form class="inline" id="kwForm"><label class="field"><span>A word or phrase</span><input id="kwIn" maxlength="60" autocomplete="off" placeholder="hurricane, FPL rate case"></label><button class="bigbtn primary">Add</button></form>
+    <p class="ferr" id="alErr" role="alert"></p>
+    ${me.shelves.length ? `<form class="inline" id="shForm"><label class="field"><span>New stories on a shelf</span><select id="shIn">${me.shelves.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select></label><button class="bigbtn">Add</button></form><p></p>` : ""}
+    ${sources.length ? `<form class="inline" id="srForm"><label class="field"><span>Every story from a source</span><select id="srIn">${sources.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select></label><button class="bigbtn">Add</button></form>` : ""}
+    <div class="sec">Delivery</div>
+    <label class="field"><span>Quiet hours (no alerts)</span><select id="quietIn">${QUIET.map(([v, l]) => `<option value="${v}" ${v === prefs.quiet.join(",") ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+    <label class="field"><span>Most alerts per day</span><select id="maxIn">${MAXES.map(n => `<option ${n === prefs.max ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+    <div class="sec">Recently sent</div><ul class="list srcs" id="recentAlerts"></ul>`);
+  renderPushBox();
+  const add = async body => { $("alErr").textContent = ""; try { await api("alerts/save", body); alertData = await api("alerts"); renderAlertList(); } catch (x) { $("alErr").textContent = x.message; } };
+  $("kwForm").addEventListener("submit", e => { e.preventDefault(); const p = $("kwIn").value.trim(); if (p) add({ kind: "keyword", phrase: p }).then(() => { $("kwIn").value = ""; }); });
+  $("shForm")?.addEventListener("submit", e => { e.preventDefault(); add({ kind: "shelf", shelf: +$("shIn").value }); });
+  $("srForm")?.addEventListener("submit", e => { e.preventDefault(); add({ kind: "source", source: +$("srIn").value }); });
+  const savePrefs = async () => {
+    const alerts = { quiet: $("quietIn").value.split(",").map(Number), max: +$("maxIn").value };
+    try { const { user } = await api("me/settings", { settings: { ...(me.user.settings || {}), alerts } }); setMe({ ...me, user }); toast("Saved"); }
+    catch (x) { $("alErr").textContent = x.message; }
+  };
+  $("quietIn").addEventListener("change", savePrefs);
+  $("maxIn").addEventListener("change", savePrefs);
+  try { alertData = await api("alerts"); renderAlertList(); } catch (x) { $("alErr").textContent = x.message; }
+}
+$("rBody").addEventListener("click", async e => {
+  const p = e.target.closest("[data-push]");
+  if (p) { p.disabled = true; try { await pushToggle(p.dataset.push); } catch (x) { toast("Could not change notifications: " + x.message); renderPushBox(); } return; }
+  const t = e.target.closest("[data-alert-on],[data-alert-rm],[data-alert-big]");
+  if (!t) return;
+  try {
+    if (t.dataset.alertOn) { const on = t.getAttribute("aria-checked") !== "true"; t.setAttribute("aria-checked", String(on)); await api("alerts/save", { id: +t.dataset.alertOn, enabled: on }); }
+    if (t.dataset.alertRm) await api("alerts/remove", { id: +t.dataset.alertRm });
+    if (t.dataset.alertBig !== undefined) await api("alerts/save", { kind: "big" });
+    alertData = await api("alerts"); renderAlertList();
+  } catch (x) { $("alErr").textContent = x.message; }
+});
+
+// A tapped notification opens its story: /#a=123 on launch, or a message from the service worker.
+async function openArticle(id) {
+  if (!state.items.some(x => x.id === id)) {
+    try { const rows = await sb(`tangent_feed?id=eq.${id}&select=*`); if (rows[0]) state.items.push(rows[0]); } catch {}
+  }
+  if (view !== "news") setView("news");
+  openReader(id);
+}
+const launchArticle = +(location.hash.match(/^#a=(\d+)$/) || [])[1] || 0;
+navigator.serviceWorker?.addEventListener("message", e => { const m = (e.data?.open || "").match(/#a=(\d+)$/); if (m) openArticle(+m[1]); });
+
 /* ---------- load ---------- */
 async function load() {
   try {
@@ -1528,6 +1659,7 @@ for (const x of document.querySelectorAll(".kinds button")) x.setAttribute("aria
 render();
 load();
 loadMe();
+if (launchArticle) openArticle(launchArticle);
 loadTrends();
 loadFeedback();
 setInterval(() => { load(); loadTrends(); loadFeedback(); }, 10 * 60e3);

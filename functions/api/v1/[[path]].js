@@ -2,7 +2,7 @@
 // Content (articles, sources) stays public and is read by the app directly from the database.
 import {
   rpc, json, sign, unsign, readCookie, cookieHeader, signOutCookies,
-  checkSignup, startSession, currentUser, sameOrigin, clientIp, EMAIL_RE, sourceUrl,
+  checkSignup, startSession, currentUser, sameOrigin, clientIp, EMAIL_RE, sourceUrl, pushSub,
 } from "../../../lib/server.js";
 
 const GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -14,7 +14,7 @@ const randomToken = (n = 32) => b64url(crypto.getRandomValues(new Uint8Array(n))
 const sha256url = async s => b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s))));
 
 // Friendly messages for errors the database raises on purpose.
-const KNOWN = { bad_url: [400, "That address does not look like a website."], email_taken: [409, "That email already has an account. Sign in instead."], too_many_shelves: [400, "You can have up to 30 shelves."], not_found: [404, "Not found."] };
+const KNOWN = { too_many_alerts: [400, "You can have up to 50 alerts."], bad_url: [400, "That address does not look like a website."], email_taken: [409, "That email already has an account. Sign in instead."], too_many_shelves: [400, "You can have up to 30 shelves."], not_found: [404, "Not found."] };
 
 async function body(request) {
   try { return await request.json(); } catch { return {}; }
@@ -175,6 +175,44 @@ const routes = {
   async "POST shelves/source"({ env, request, user }) {
     const b = await body(request);
     await rpc(env, "tangent_shelf_source", { p_user: user.id, p_shelf: +b.shelf, p_source: +b.source, p_add: !!b.add });
+    return json({ ok: true });
+  },
+
+  // ---- alerts and push ----
+  async "GET alerts"({ env, user }) {
+    return json(await rpc(env, "tangent_alerts_get", { p_user: user.id }));
+  },
+  async "POST alerts/save"({ env, request, user }) {
+    const b = await body(request);
+    const a = { id: b.id ?? null, kind: b.kind, enabled: typeof b.enabled === "boolean" ? b.enabled : null };
+    if (!a.id) {
+      if (!["big", "keyword", "shelf", "source"].includes(b.kind)) return json({ error: "Unknown alert." }, 400);
+      if (b.kind === "keyword") {
+        const p = typeof b.phrase === "string" ? b.phrase.trim().replace(/\s+/g, " ") : "";
+        if (p.length < 2 || p.length > 60) return json({ error: "Use a word or phrase of 2 to 60 characters." }, 400);
+        a.phrase = p;
+      }
+      if (b.kind === "shelf") a.shelf = +b.shelf;
+      if (b.kind === "source") a.source = +b.source;
+    }
+    return json({ id: await rpc(env, "tangent_alert_save", { p_user: user.id, p_alert: a }) });
+  },
+  async "POST alerts/remove"({ env, request, user }) {
+    const b = await body(request);
+    await rpc(env, "tangent_alert_remove", { p_user: user.id, p_id: +b.id });
+    return json({ ok: true });
+  },
+  async "POST push/subscribe"({ env, request, user }) {
+    const b = await body(request);
+    const sub = pushSub(b.subscription);
+    if (!sub) return json({ error: "This browser's notification service is not supported." }, 400);
+    const tz = typeof b.tz === "string" && /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+){0,2}$/.test(b.tz) ? b.tz : null;
+    await rpc(env, "tangent_push_subscribe", { p_user: user.id, p_endpoint: sub.endpoint, p_p256dh: sub.p256dh, p_auth: sub.auth, p_ua: request.headers.get("user-agent") || "", p_tz: tz });
+    return json({ ok: true });
+  },
+  async "POST push/unsubscribe"({ env, request, user }) {
+    const b = await body(request);
+    if (typeof b.endpoint === "string") await rpc(env, "tangent_push_unsubscribe", { p_user: user.id, p_endpoint: b.endpoint });
     return json({ ok: true });
   },
 
