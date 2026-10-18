@@ -21,7 +21,7 @@ async function article(id) {
 export function page(a, { from = "", origin = "https://tangentreads.com" } = {}) {
   const title = a ? clip(a.title, 140) : "Story not found";
   const teaser = a ? clip(a.summary_short || a.excerpt || "", 220) : "";
-  const img = a && /^https?:\/\//.test(a.image || "") ? a.image : `${origin}/shot-desktop.jpg`;
+  const img = a && /^https?:\/\//.test(a.image || "") ? a.image : `${origin}/shot-desktop-v2.jpg`;
   const lead = from ? `${esc(from)} shared this with you on Tangent` : "Shared with you on Tangent";
   const open = a ? `/#a=${a.id}` : "/";
   return `<!doctype html>
