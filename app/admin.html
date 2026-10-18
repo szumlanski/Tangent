@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Admin · Tangent</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f4f1ec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0d0f" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="site.css">
+<style>
+.adm { padding-top: 20px; padding-bottom: 60px; }
+.adm h1 { font-size: 32px; margin: 0 0 4px; }
+.tabsbar { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin: 16px 0 20px; border-bottom: 1px solid var(--sep); }
+.tabsbar button { flex: none; min-height: 44px; padding: 0 14px; border: 0; background: none; font: 600 16px var(--f-ui); color: var(--label-2); border-bottom: 3px solid transparent; }
+.tabsbar button[aria-selected="true"] { color: var(--label); border-bottom-color: var(--tint); }
+.tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (min-width: 700px) { .tiles { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 1000px) { .tiles { grid-template-columns: repeat(6, 1fr); } }
+.tile { background: var(--card); border: 1px solid var(--sep); border-radius: 14px; padding: 12px 14px; }
+.tile b { display: block; font: 700 28px/1.1 var(--f-head); }
+.tile span { font-size: 14px; color: var(--label-2); }
+.tile.warn b { color: var(--tint); }
+.sec2 { font: 700 20px var(--f-head); margin: 28px 0 10px; }
+.chart { background: var(--card); border: 1px solid var(--sep); border-radius: 14px; padding: 14px; }
+.chart svg { width: 100%; height: 120px; display: block; }
+.chart .cap { display: flex; justify-content: space-between; font-size: 13px; color: var(--label-2); margin-top: 6px; }
+.charts { display: grid; gap: 12px; }
+@media (min-width: 800px) { .charts { grid-template-columns: 1fr 1fr; } }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.filters input, .filters select { min-height: 44px; border-radius: 10px; border: 1px solid var(--sep); background: var(--card); color: var(--label); font: 400 16px var(--f-ui); padding: 0 12px; }
+.filters input { flex: 1 1 200px; }
+.rows { display: grid; gap: 8px; }
+.row { background: var(--card); border: 1px solid var(--sep); border-radius: 12px; padding: 12px 14px; display: grid; gap: 4px; }
+.row .t { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.row .t b { font-size: 17px; overflow-wrap: anywhere; }
+.row .m { font-size: 14px; color: var(--label-2); overflow-wrap: anywhere; }
+.row .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.row .acts button { min-height: 36px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--sep); background: none; font: 600 14px var(--f-ui); color: var(--label); }
+.row .acts button.bad { color: #d23c25; }
+.badge { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: var(--sep); color: var(--label); }
+.badge.k-login_fail, .badge.k-server_error, .badge.k-rate_limited, .badge.k-refused, .badge.bad { background: #d23c25; color: #fff; }
+.badge.k-signup, .badge.good { background: #1d8a43; color: #fff; }
+.badge.k-admin_action { background: var(--tint); color: #fff; }
+.more { margin-top: 12px; }
+.msg { color: var(--label-2); padding: 24px 0; }
+</style>
+</head>
+<body>
+<header class="mast"><div class="wrap"><a class="logo" href="/"><img class="mark" src="mark.svg" alt="" width="28" height="30">Tangent</a><nav aria-label="Site"><a href="/">Open Tangent</a></nav></div></header>
+<main class="wrap adm">
+  <h1>Admin</h1>
+  <p class="muted small" id="who"></p>
+  <div class="tabsbar" role="tablist">
+    <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button role="tab" data-tab="users" aria-selected="false">Users</button>
+    <button role="tab" data-tab="log" aria-selected="false">Activity log</button>
+    <button role="tab" data-tab="sources" aria-selected="false">Sources</button>
+    <button role="tab" data-tab="suggestions" aria-selected="false">Suggestions</button>
+  </div>
+  <div id="view"><p class="msg">Loading…</p></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const when = t => t ? new Date(t).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "never";
+const ago = t => { if (!t) return "never"; const m = Math.round((Date.now() - Date.parse(t)) / 6e4); return m < 60 ? m + "m ago" : m < 1440 ? Math.round(m / 60) + "h ago" : Math.round(m / 1440) + "d ago"; };
+async function api(path, body) {
+  const r = await fetch("/api/v1/" + path, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {});
+  if (r.status === 401) { location.replace("/welcome#signin"); throw new Error("signed out"); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "Request failed");
+  return j;
+}
+const KINDS = ["open", "signup", "login", "login_fail", "logout", "password_change", "password_fail", "account_closed", "persona_new", "persona_removed", "shelf_new", "shelf_removed",
+  "source_request", "push_on", "guest_push_on", "guest_push_off", "share_open", "rate_limited", "refused", "server_error", "admin_action", "fetch_run"];
+let tab = "overview";
+
+function bars(series, label) {
+  const max = Math.max(1, ...series.map(d => d.n)), W = 300, H = 110, bw = W / series.length;
+  return `<div class="chart"><b>${esc(label)}</b><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(label)}">${series.map((d, i) =>
+    `<rect x="${(i * bw + 1).toFixed(1)}" y="${(H - d.n / max * (H - 4)).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${(d.n / max * (H - 4)).toFixed(1)}" rx="1.5" fill="var(--tint)"><title>${esc(d.day)}: ${d.n}</title></rect>`).join("")}</svg>
+    <div class="cap"><span>${esc(series[0]?.day || "")}</span><span>max ${max}</span><span>${esc(series.at(-1)?.day || "")}</span></div></div>`;
+}
+const tile = (n, label, warn) => `<div class="tile${warn && n ? " warn" : ""}"><b>${n ?? "–"}</b><span>${label}</span></div>`;
+
+async function overview() {
+  const o = await api("admin/overview");
+  const u = o.users, us = o.usage, c = o.content, lf = c.last_fetch;
+  return `<div class="tiles">
+      ${tile(u.total, "Users")}${tile(u.new_7d, "New this week")}${tile(u.active_1d, "Active today")}${tile(u.active_7d, "Active this week")}${tile(u.active_30d, "Active 30 days")}${tile(u.google, "Use Google")}
+    </div>
+    <div class="charts" style="margin-top:12px">${bars(o.signups, "Sign-ups, last 30 days")}${bars(o.active, "Active users per day")}</div>
+    <div class="sec2">Usage</div>
+    <div class="tiles">
+      ${tile(us.personas, "Personas")}${tile(us.shelves, "Shelves")}${tile(us.votes, "Votes")}${tile(us.hides, "Hidden stories")}${tile(us.alerts, "Alerts on")}${tile(us.devices + us.guest_devices, `Push devices (${us.guest_devices} guests)`)}
+      ${tile(us.pushes_1d, "Pushes today")}${tile(us.pushes_7d, "Pushes this week")}${tile(us.shares_7d, "Share opens this week")}${tile(us.logins_failed_1d, "Failed sign-ins today", true)}${tile(us.errors_1d, "Server errors today", true)}${tile(u.disabled, "Disabled users", true)}
+    </div>
+    <div class="sec2">Content</div>
+    <div class="tiles">
+      ${tile(c.sources_active, "Active sources")}${tile(c.sources_pending, "Being checked")}${tile(c.sources_failing, "Failing", true)}${tile(c.sources_disabled, "Turned off")}${tile(c.articles_1d, "Stories today")}${tile(c.stories_summarized_1d, "Summaries today")}
+    </div>
+    <p class="muted small" style="margin-top:14px">Last fetch: ${lf ? `${ago(lf.at)}, ${lf.detail.added ?? 0} new stories from ${lf.detail.sources ?? "?"} sources, ${lf.detail.failed ?? 0} failed, ${lf.detail.seconds ?? "?"}s` : "not logged yet"}. ${c.paywalled_1d} paywalled stories dropped today.</p>`;
+}
+
+let users = [];
+async function usersView(q = "") {
+  users = await api("admin/users?q=" + encodeURIComponent(q));
+  return `<div class="filters"><input id="uq" placeholder="Search email or name" value="${esc(q)}"></div>
+    <div class="rows">${users.map(u => `<div class="row"><div class="t"><b>${esc(u.email)}</b>${u.name ? `<span class="m">${esc(u.name)}</span>` : ""}
+      ${u.is_admin ? `<span class="badge">Admin</span>` : ""}${u.disabled_at ? `<span class="badge bad">Disabled</span>` : ""}</div>
+      <div class="m">Joined ${when(u.created_at)} · last seen ${ago(u.last_seen)} · ${[u.has_password && "password", u.has_google && "Google"].filter(Boolean).join(" + ") || "no sign-in"}</div>
+      <div class="m">${u.personas} personas · ${u.shelves} shelves · ${u.votes} votes · ${u.sources_added} sources added · ${u.devices} push devices · ${u.sessions} signed-in devices</div>
+      <div class="acts"><button data-log="${esc(u.email)}">Activity</button><button data-u="${u.id}" data-a="signout">Sign out everywhere</button>
+        ${u.disabled_at ? `<button data-u="${u.id}" data-a="enable">Enable</button>` : `<button class="bad" data-u="${u.id}" data-a="disable">Disable</button>`}
+        ${u.is_admin ? `<button data-u="${u.id}" data-a="unadmin">Remove admin</button>` : `<button data-u="${u.id}" data-a="admin">Make admin</button>`}</div></div>`).join("") || `<p class="msg">No users match.</p>`}</div>`;
+}
+
+let logRows = [], logKind = "", logQ = "";
+const summary = d => Object.entries(d || {}).filter(([, v]) => v != null && v !== "").map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join(" · ");
+const logRowHTML = r => `<div class="row"><div class="t"><span class="badge k-${esc(r.kind)}">${esc(r.kind)}</span><b>${esc(r.email || "")}</b><span class="m">${when(r.at)}</span></div>
+  <div class="m">${esc(summary(r.detail))}</div>${r.ip || r.ua ? `<div class="m">${esc(r.ip || "")}${r.ua ? " · " + esc(r.ua.slice(0, 90)) : ""}</div>` : ""}</div>`;
+async function logView() {
+  logRows = await api(`admin/log?kind=${encodeURIComponent(logKind)}&q=${encodeURIComponent(logQ)}`);
+  return `<div class="filters"><select id="lk"><option value="">All events</option>${KINDS.map(k => `<option ${k === logKind ? "selected" : ""}>${k}</option>`).join("")}</select>
+    <input id="lq" placeholder="Email, IP or text" value="${esc(logQ)}"></div>
+    <div class="rows" id="logRows">${logRows.map(logRowHTML).join("") || `<p class="msg">Nothing logged yet.</p>`}</div>
+    ${logRows.length >= 150 ? `<button class="btn more" id="lmore">Load older</button>` : ""}`;
+}
+
+let srcs = [], srcFilter = "problems", srcQ = "";
+async function sourcesView(reload = true) {
+  if (reload) srcs = await api("admin/sources");
+  const f = { problems: s => s.problem || (s.status === "active" && !s.enabled), all: () => true, pending: s => s.status === "pending", rejected: s => s.status === "rejected", added: s => s.added_by };
+  const list = srcs.filter(f[srcFilter]).filter(s => !srcQ || `${s.name} ${s.site_url} ${s.topic}`.toLowerCase().includes(srcQ.toLowerCase()));
+  return `<div class="filters"><select id="sf">${[["problems", "Problems"], ["all", "All"], ["pending", "Being checked"], ["rejected", "Rejected"], ["added", "Added by readers"]].map(([k, l]) => `<option value="${k}" ${k === srcFilter ? "selected" : ""}>${l}</option>`).join("")}</select>
+    <input id="sq" placeholder="Search name, site or topic" value="${esc(srcQ)}"></div>
+    <p class="muted small">${list.length} of ${srcs.length} sources</p>
+    <div class="rows">${list.slice(0, 300).map(s => `<div class="row"><div class="t"><b>${esc(s.name)}</b><span class="badge">${esc(s.topic)}</span>
+      ${s.status !== "active" ? `<span class="badge ${s.status === "rejected" ? "bad" : ""}">${esc(s.status)}</span>` : !s.enabled ? `<span class="badge bad">off</span>` : s.problem ? `<span class="badge bad">failing</span>` : `<span class="badge good">ok</span>`}</div>
+      <div class="m">${esc(s.site_url)} · ${s.shelves} shelves${s.added_by ? " · added by " + esc(s.added_by) : ""}</div>
+      <div class="m">Last good fetch ${ago(s.last_ok_at)}${s.last_strategy ? ` via ${esc(s.last_strategy)}, ${s.last_count} items` : ""} · ${s.paywall_seen}/${s.items_seen} paywalled</div>
+      ${s.last_error || s.status_note || s.disabled_reason ? `<div class="m">${esc(s.last_error || s.status_note || s.disabled_reason)}</div>` : ""}
+      <div class="acts">${s.enabled ? `<button class="bad" data-s="${s.id}" data-a="disable">Turn off</button>` : `<button data-s="${s.id}" data-a="enable">Turn on</button>`}
+        ${s.status !== "rejected" ? `<button class="bad" data-s="${s.id}" data-a="reject">Remove from catalog</button>` : ""}</div></div>`).join("") || `<p class="msg">Nothing here.</p>`}</div>`;
+}
+
+async function suggestionsView() {
+  const r = await fetch("https://kyplwgcvbfzyfhiyspsr.supabase.co/rest/v1/tangent_source_suggestions?select=*&order=created_at.desc&limit=50",
+    { headers: { apikey: "sb_publishable_LqD81rhJPP9kVN_Rdw22eQ_jhZ3Hc_r", authorization: "Bearer sb_publishable_LqD81rhJPP9kVN_Rdw22eQ_jhZ3Hc_r" } });
+  const rows = r.ok ? await r.json() : [];
+  return `<p class="muted small">Found by the weekly scout: outlets that keep covering Tangent's topics, already checked for paywalls and freshness.</p>
+    <div class="rows">${rows.map(s => `<div class="row" data-row="${s.id}"><div class="t"><b>${esc(s.name)}</b><span class="badge">${esc(s.topic)}</span></div>
+      <div class="m">${esc(s.domain)} · ${Math.round(s.per_week || 0)} posts this week · ${Math.round((s.free_ratio || 0) * 100)}% free · ${esc(s.reason || "")}</div>
+      <div class="acts"><button data-g="${s.id}" data-a="add">Add to catalog</button><button data-g="${s.id}" data-a="dismiss">Dismiss</button></div></div>`).join("") || `<p class="msg">No suggestions waiting.</p>`}</div>`;
+}
+
+async function show(t) {
+  tab = t;
+  for (const b of document.querySelectorAll(".tabsbar button")) b.setAttribute("aria-selected", String(b.dataset.tab === t));
+  $("view").innerHTML = `<p class="msg">Loading…</p>`;
+  try { $("view").innerHTML = await ({ overview, users: usersView, log: logView, sources: sourcesView, suggestions: suggestionsView })[t](); }
+  catch (e) { $("view").innerHTML = `<p class="msg">${e.message === "Admins only." ? "This page is for Tangent admins. <a href=\"/\">Back to Tangent</a>" : esc(e.message)}</p>`; }
+}
+document.querySelector(".tabsbar").addEventListener("click", e => { const b = e.target.closest("button"); if (b) show(b.dataset.tab); });
+
+let timer;
+$("view").addEventListener("input", e => {
+  clearTimeout(timer);
+  timer = setTimeout(async () => {
+    if (e.target.id === "uq") { const v = e.target.value; $("view").innerHTML = await usersView(v); const i = $("uq"); i.focus(); i.setSelectionRange(v.length, v.length); }
+    if (e.target.id === "lq") { logQ = e.target.value; $("view").innerHTML = await logView(); const i = $("lq"); i.focus(); i.setSelectionRange(logQ.length, logQ.length); }
+    if (e.target.id === "sq") { srcQ = e.target.value; $("view").innerHTML = await sourcesView(false); const i = $("sq"); i.focus(); i.setSelectionRange(srcQ.length, srcQ.length); }
+  }, 300);
+});
+$("view").addEventListener("change", async e => {
+  if (e.target.id === "lk") { logKind = e.target.value; $("view").innerHTML = await logView(); }
+  if (e.target.id === "sf") { srcFilter = e.target.value; $("view").innerHTML = await sourcesView(false); }
+});
+$("view").addEventListener("click", async e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.log) { logQ = b.dataset.log; logKind = ""; return show("log"); }
+  if (b.id === "lmore") {
+    const more = await api(`admin/log?kind=${encodeURIComponent(logKind)}&q=${encodeURIComponent(logQ)}&before=${logRows.at(-1).id}`);
+    logRows.push(...more); $("logRows").insertAdjacentHTML("beforeend", more.map(logRowHTML).join(""));
+    if (more.length < 150) b.remove();
+    return;
+  }
+  const risky = { disable: "Disable this account and sign it out everywhere?", reject: "Remove this source from the catalog for everyone?", unadmin: "Remove admin rights?" };
+  if (risky[b.dataset.a] && !confirm(risky[b.dataset.a])) return;
+  b.disabled = true;
+  try {
+    if (b.dataset.u) { await api("admin/user", { id: b.dataset.u, action: b.dataset.a }); $("view").innerHTML = await usersView($("uq")?.value || ""); }
+    if (b.dataset.s) { await api("admin/source", { id: +b.dataset.s, action: b.dataset.a }); $("view").innerHTML = await sourcesView(); }
+    if (b.dataset.g) { await api("admin/suggestion", { id: +b.dataset.g, action: b.dataset.a }); b.closest(".row").innerHTML = `<div class="m">${b.dataset.a === "add" ? "Added. It is fetched on the next run." : "Dismissed."}</div>`; }
+  } catch (x) { alert(x.message); b.disabled = false; }
+});
+
+api("me").then(m => { $("who").textContent = `Signed in as ${m.user.email}`; if (!m.user.is_admin) throw new Error("Admins only."); show("overview"); })
+  .catch(e => { if (e.message !== "signed out") $("view").innerHTML = `<p class="msg">This page is for Tangent admins. <a href="/">Back to Tangent</a></p>`; });
+</script>
+</body>
+</html>

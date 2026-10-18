@@ -1,7 +1,7 @@
 // /s/<article id>: the page a shared Tangent link opens. Rendered here (not in the app) so link previews
 // in Messages, Slack and email show the story. Offers two ways in: read it in Tangent without an account,
 // or create one. Paywalled articles never appear (the feed view excludes them). Cached at the edge.
-import { SB_URL, SB_KEY } from "../../lib/server.js";
+import { SB_URL, SB_KEY, rpc, clientIp } from "../../lib/server.js";
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const clip = (s, n) => (s = String(s || "").replace(/\s+/g, " ").trim()).length > n ? s.slice(0, n - 1).trimEnd() + "…" : s;
@@ -80,9 +80,12 @@ document.getElementById("read").addEventListener("click", function () {
 </html>`;
 }
 
-export async function onRequestGet({ request, params, waitUntil }) {
+export async function onRequestGet({ request, params, waitUntil, env }) {
   const url = new URL(request.url);
   const id = String(params.id || "");
+  // Count opens for the admin dashboard (link-preview bots included; they read the same page).
+  if (env?.TANGENT_SERVER_SECRET && /^\d{1,12}$/.test(id))
+    waitUntil(rpc(env, "tangent_log", { p_kind: "share_open", p_user: null, p_ip: clientIp(request), p_ua: request.headers.get("user-agent") || "", p_detail: { article: +id, from: sharerName(url.searchParams.get("f")) || null } }).catch(() => {}));
   if (!/^\d{1,12}$/.test(id)) return new Response(page(null, { origin: url.origin }), { status: 404, headers: { "content-type": "text/html; charset=utf-8" } });
   const from = sharerName(url.searchParams.get("f"));
   // Cache the page per article and sharer name for ten minutes.

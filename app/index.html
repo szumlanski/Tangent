@@ -1288,12 +1288,14 @@ async function renderSuggestions() {
   let rows = [];
   try { rows = await sb("tangent_source_suggestions?select=*&order=created_at.desc&limit=30"); } catch { return; }
   if (!rows.length) { box.innerHTML = ""; return; }
-  const key = store.get("ownerKey", "");
+  // Approving is for admins (signed in); the old owner-key link is retired.
+  const admin = !!me?.user?.is_admin;
+  if (!admin) { box.innerHTML = ""; return; }
   box.innerHTML = `<div class="sec">Suggested by the weekly scout</div><div class="panel">${rows.map(r => `<div class="sugg" data-id="${r.id}">
       <div><b>${esc(r.name)}</b> <span class="muted">· ${esc(TOPIC_NAMES[r.topic] || r.topic)} · ${esc(r.domain)}</span></div>
       <div class="muted">${esc(r.reason || "")} · ${Math.round(r.per_week || 0)} posts this week · ${Math.round((r.free_ratio || 0) * 100)}% free</div>
       <ul>${(r.samples || []).map(x => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a></li>`).join("")}</ul>
-      <div class="acts">${key ? `<button class="add" data-act="add">Add source</button><button data-act="dismiss">Dismiss</button>` : `<span class="muted">Open your setup link on this device to approve sources.</span>`}</div>
+      <div class="acts"><button class="add" data-act="add">Add source</button><button data-act="dismiss">Dismiss</button></div>
     </div>`).join("")}</div>`;
 }
 document.addEventListener("click", async e => {
@@ -1302,11 +1304,11 @@ document.addEventListener("click", async e => {
   const row = b.closest(".sugg");
   b.disabled = true;
   try {
-    await rpc("tangent_review_suggestion", { p_id: +row.dataset.id, p_action: b.dataset.act, p_key: store.get("ownerKey", "") });
+    await api("admin/suggestion", { id: +row.dataset.id, action: b.dataset.act });
     row.innerHTML = `<span class="muted">${b.dataset.act === "add" ? "Added. It will be fetched on the next run." : "Dismissed."}</span>`;
   } catch (err) {
     b.disabled = false;
-    row.querySelector(".acts").insertAdjacentHTML("beforeend", `<span class="muted">${/bad key/.test(err.message) ? "This device's key is wrong. Open your setup link again." : "Could not save. Try again."}</span>`);
+    row.querySelector(".acts").insertAdjacentHTML("beforeend", `<span class="muted">${esc(err.message || "Could not save. Try again.")}</span>`);
   }
 });
 
@@ -1377,6 +1379,7 @@ function openAccount() {
     <div class="personas" role="radiogroup" aria-label="Personas">${ps.map(p => `<button role="radio" aria-checked="${p.id === me.persona}" data-persona="${p.id}">${avatarHTML(p, "pav")}<span>${esc(p.name)}</span></button>`).join("")}
       ${ps.length < 8 ? `<button data-go="newpersona" aria-label="Add a persona"><span class="pav add" aria-hidden="true">+</span><span>Add</span></button>` : ""}</div>
     <div class="sec">${esc(curPersona()?.name || "This persona")}</div>${menu([go("persona", "Name and picture"), go("shelves", "Shelves"), go("alerts", "Alerts"), go("sources", "Sources")])}
+    ${u.is_admin ? `<div class="sec">Admin</div>${menu([`<li><a href="/admin">Admin dashboard</a></li>`])}` : ""}
     <div class="sec">Help</div>${menu([go("help", "Help and FAQ"), `<li><a href="/privacy">Privacy</a></li>`, `<li><a href="/terms">Terms</a></li>`])}
     <div class="sec">Account</div>${menu([go("password", u.has_password ? "Change password" : "Set a password"), `<li><button data-act="signout">Sign out</button></li>`,
       `<li><button data-act="signout-all">Sign out everywhere</button></li>`, go("delete", "Delete account", "danger")])}`);

@@ -129,3 +129,5 @@ export async function saveShelfSuggestions(searchSourceId, outlets) {
   const rows = shelves.flatMap(s => outlets.map(o => ({ shelf_id: s.shelf_id, domain: o.domain, name: o.name, url: o.url, source_id: o.source_id, hits: o.hits, updated_at: at })));
   if (rows.length) await rest("tangent_shelf_suggestions?on_conflict=shelf_id,domain", { method: "POST", body: rows, prefer: "resolution=merge-duplicates,return=minimal" });
 }
+
+export const logEvent = (kind, detail) => DRY ? null : rest("tangent_events_log", { method: "POST", body: [{ kind, detail }], prefer: "return=minimal" });

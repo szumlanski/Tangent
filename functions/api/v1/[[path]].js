@@ -14,7 +14,7 @@ const randomToken = (n = 32) => b64url(crypto.getRandomValues(new Uint8Array(n))
 const sha256url = async s => b64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s))));
 
 // Friendly messages for errors the database raises on purpose.
-const KNOWN = { too_many_personas: [400, "You can have up to 8 personas."], last_persona: [400, "You need at least one persona."], too_many_alerts: [400, "You can have up to 50 alerts."], bad_url: [400, "That address does not look like a website."], email_taken: [409, "That email already has an account. Sign in instead."], too_many_shelves: [400, "You can have up to 30 shelves."], not_found: [404, "Not found."] };
+const KNOWN = { forbidden: [403, "Admins only."], not_yourself: [400, "You can't do that to your own account."], bad_action: [400, "Unknown action."], too_many_personas: [400, "You can have up to 8 personas."], last_persona: [400, "You need at least one persona."], too_many_alerts: [400, "You can have up to 50 alerts."], bad_url: [400, "That address does not look like a website."], email_taken: [409, "That email already has an account. Sign in instead."], too_many_shelves: [400, "You can have up to 30 shelves."], not_found: [404, "Not found."] };
 
 async function body(request) {
   try { return await request.json(); } catch { return {}; }
@@ -42,28 +42,31 @@ const allow = (env, key, limit, windowS) => rpc(env, "tangent_rate_hit", { p_key
 
 const routes = {
   // ---- email and password ----
-  async "POST auth/signup"({ env, request }) {
+  async "POST auth/signup"({ env, request, log }) {
     const b = await body(request);
     const problem = checkSignup(b);
     if (problem) return json({ error: problem }, 400);
-    if (!(await allow(env, "signup:" + clientIp(request), 10, 3600))) return json({ error: "Too many sign-ups from this network. Try again in an hour." }, 429);
+    if (!(await allow(env, "signup:" + clientIp(request), 10, 3600))) { log("rate_limited", { route: "signup" }); return json({ error: "Too many sign-ups from this network. Try again in an hour." }, 429); }
     const user = await rpc(env, "tangent_signup", { p_email: b.email.trim(), p_name: (b.name || "").trim(), p_password: b.password });
+    log("signup", { method: "email" }, user);
     return json({ user }, 200, { "set-cookie": await startSession(env, request, user) });
   },
 
-  async "POST auth/login"({ env, request }) {
+  async "POST auth/login"({ env, request, log }) {
     const b = await body(request);
     if (typeof b.email !== "string" || typeof b.password !== "string" || !EMAIL_RE.test(b.email.trim())) return json({ error: "Enter your email and password." }, 400);
     const ipOk = await allow(env, "login-ip:" + clientIp(request), 30, 900);
     const emailOk = await allow(env, "login-email:" + b.email.trim().toLowerCase(), 8, 900);
-    if (!ipOk || !emailOk) return json({ error: "Too many tries. Wait 15 minutes and try again." }, 429);
+    if (!ipOk || !emailOk) { log("rate_limited", { route: "login", email: b.email.trim().toLowerCase() }); return json({ error: "Too many tries. Wait 15 minutes and try again." }, 429); }
     const user = await rpc(env, "tangent_login", { p_email: b.email.trim(), p_password: b.password });
-    if (!user) return json({ error: "That email and password don't match." }, 401);
+    if (!user) { log("login_fail", { method: "email", email: b.email.trim().toLowerCase() }); return json({ error: "That email and password don't match." }, 401); }
+    log("login", { method: "email" }, user);
     return json({ user }, 200, { "set-cookie": await startSession(env, request, user) });
   },
 
-  async "POST auth/logout"({ env, request, sid }) {
+  async "POST auth/logout"({ env, request, sid, user, log }) {
     const b = await body(request);
+    if (user) log("logout", { everywhere: !!b.all });
     if (sid) await rpc(env, "tangent_session_end", { p_sid: sid, p_all: !!b.all });
     return json({ ok: true }, 200, { "set-cookie": signOutCookies() });
   },
@@ -87,9 +90,9 @@ const routes = {
     return new Response(null, { status: 302, headers: { location: `${GOOGLE_AUTH}?${q}`, "set-cookie": cookie } });
   },
 
-  async "GET auth/google/callback"({ env, request }) {
+  async "GET auth/google/callback"({ env, request, log }) {
     const url = new URL(request.url);
-    const fail = msg => new Response(null, { status: 302, headers: { location: "/welcome?signin_error=" + encodeURIComponent(msg) } });
+    const fail = msg => (log("login_fail", { method: "google", reason: msg }), new Response(null, { status: 302, headers: { location: "/welcome?signin_error=" + encodeURIComponent(msg) } }));
     const raw = readCookie(request, OAUTH_COOKIE);
     const saved = raw && await unsign(raw, env.SESSION_SECRET);
     if (!saved) return fail("Sign-in expired. Please try again.");
@@ -112,6 +115,7 @@ const routes = {
     if (claims.aud !== env.GOOGLE_CLIENT_ID || !["accounts.google.com", "https://accounts.google.com"].includes(claims.iss) || claims.exp * 1000 < Date.now()) return fail("Google sign-in could not be verified.");
     if (!claims.email_verified) return fail("Your Google email is not verified.");
     const user = await rpc(env, "tangent_google", { p_sub: claims.sub, p_email: claims.email, p_name: claims.name || "" });
+    log("login", { method: "google" }, user);
     const headers = new Headers({ location: back });
     for (const c of await startSession(env, request, user)) headers.append("set-cookie", c);
     headers.append("set-cookie", `${OAUTH_COOKIE}=; Path=/api/v1/auth/google; Max-Age=0; HttpOnly; Secure; SameSite=Lax`);
@@ -119,7 +123,8 @@ const routes = {
   },
 
   // ---- signed-in user ----
-  async "GET me"({ env, user, persona }) {
+  async "GET me"({ env, user, persona, log }) {
+    log("open", { persona });
     const me = await rpc(env, "tangent_me", { p_user: user.id, p_persona: persona });
     return json({ ...me, google: !!env.GOOGLE_CLIENT_ID });
   },
@@ -130,18 +135,20 @@ const routes = {
     return json({ user: await rpc(env, "tangent_save_settings", { p_user: user.id, p_settings: b.settings ?? null, p_name: b.name ?? null }) });
   },
 
-  async "POST me/password"({ env, request, user }) {
+  async "POST me/password"({ env, request, user, log }) {
     const b = await body(request);
     if (typeof b.new !== "string" || b.new.length < 8 || b.new.length > 200) return json({ error: "Use a password of at least 8 characters." }, 400);
     if (!(await allow(env, "pw:" + user.id, 10, 3600))) return json({ error: "Too many tries. Try again later." }, 429);
     const ok = await rpc(env, "tangent_set_password", { p_user: user.id, p_current: b.current ?? null, p_new: b.new });
+    log(ok ? "password_change" : "password_fail");
     return ok ? json({ ok: true }) : json({ error: "Your current password is not right." }, 403);
   },
 
-  async "POST me/delete"({ env, request, user }) {
+  async "POST me/delete"({ env, request, user, log }) {
     const b = await body(request);
     if (b.confirm !== "DELETE") return json({ error: "Type DELETE to confirm." }, 400);
     await rpc(env, "tangent_close_account", { p_user: user.id });
+    log("account_closed");
     return json({ ok: true }, 200, { "set-cookie": signOutCookies() });
   },
 
@@ -153,14 +160,17 @@ const routes = {
   },
 
   // ---- personas ----
-  async "POST personas/save"({ env, request, user }) {
+  async "POST personas/save"({ env, request, user, log }) {
     const b = await body(request);
     const p = personaInput(b);
     if (p.error) return json({ error: p.error }, 400);
-    return json({ id: await rpc(env, "tangent_persona_save", { p_user: user.id, p_p: p }) });
+    const id = await rpc(env, "tangent_persona_save", { p_user: user.id, p_p: p });
+    if (!p.id) log("persona_new", { id, name: p.name });
+    return json({ id });
   },
-  async "POST personas/remove"({ env, request, user }) {
+  async "POST personas/remove"({ env, request, user, log }) {
     const b = await body(request);
+    log("persona_removed", { id: +b.id });
     await rpc(env, "tangent_persona_remove", { p_user: user.id, p_id: +b.id });
     return json({ ok: true });
   },
@@ -172,13 +182,14 @@ const routes = {
     await rpc(env, "tangent_add_topic_shelves", { p_user: user.id, p_persona: persona, p_topics: b.topics.map(String) });
     return json(await rpc(env, "tangent_me", { p_user: user.id, p_persona: persona }));
   },
-  async "POST shelves/save"({ env, request, user, persona }) {
+  async "POST shelves/save"({ env, request, user, persona, log }) {
     const b = await body(request);
     if (!b.id && !(typeof b.name === "string" && b.name.trim())) return json({ error: "Give the shelf a name." }, 400);
     const query = typeof b.query === "string" ? b.query.trim().slice(0, 80) : "";
     const id = await rpc(env, "tangent_save_shelf", { p_user: user.id, p_persona: persona, p_shelf: { id: b.id ?? null, name: b.name ?? null, position: b.position ?? null, query: query || null } });
     // A shelf started from a phrase follows that phrase in the news from the first fetch.
     if (!b.id && query) await rpc(env, "tangent_request_source", { p_user: user.id, p_shelf: id, p_url: null, p_query: query });
+    if (!b.id) log("shelf_new", { id, name: b.name, query: query || null });
     return json({ id });
   },
   async "POST shelves/order"({ env, request, user }) {
@@ -200,17 +211,20 @@ const routes = {
     return json({ ok: true });
   },
   // Paste a site, feed or YouTube channel, or follow a phrase. New ones are checked by the fetcher before use.
-  async "POST shelves/request"({ env, request, user }) {
+  async "POST shelves/request"({ env, request, user, log }) {
     const b = await body(request);
     const query = typeof b.query === "string" ? b.query.trim() : "";
     const url = query ? null : sourceUrl(b.url);
     if (!query && !url) return json({ error: "Paste a website, feed or YouTube channel address." }, 400);
     if (query.length > 80) return json({ error: "Keep the phrase under 80 characters." }, 400);
-    if (!(await allow(env, "src:" + user.id, 40, 86400))) return json({ error: "That's a lot of new sources for one day. Try again tomorrow." }, 429);
-    return json({ source: await rpc(env, "tangent_request_source", { p_user: user.id, p_shelf: +b.shelf, p_url: url, p_query: query || null }) });
+    if (!(await allow(env, "src:" + user.id, 40, 86400))) { log("rate_limited", { route: "source_request" }); return json({ error: "That's a lot of new sources for one day. Try again tomorrow." }, 429); }
+    const source = await rpc(env, "tangent_request_source", { p_user: user.id, p_shelf: +b.shelf, p_url: url, p_query: query || null });
+    log("source_request", { shelf: +b.shelf, url, query: query || null, source: source.id, status: source.status });
+    return json({ source });
   },
-  async "POST shelves/remove"({ env, request, user }) {
+  async "POST shelves/remove"({ env, request, user, log }) {
     const b = await body(request);
+    log("shelf_removed", { id: +b.id });
     await rpc(env, "tangent_remove_shelf", { p_user: user.id, p_shelf: +b.id });
     return json({ ok: true });
   },
@@ -244,20 +258,22 @@ const routes = {
     await rpc(env, "tangent_alert_remove", { p_user: user.id, p_id: +b.id });
     return json({ ok: true });
   },
-  async "POST push/subscribe"({ env, request, user, persona }) {
+  async "POST push/subscribe"({ env, request, user, persona, log }) {
     const b = await body(request);
     const sub = pushSub(b.subscription);
     if (!sub) return json({ error: "This browser's notification service is not supported." }, 400);
     const tz = timeZone(b.tz);
+    log("push_on", { host: new URL(sub.endpoint).hostname });
     await rpc(env, "tangent_push_subscribe", { p_user: user.id, p_persona: persona, p_endpoint: sub.endpoint, p_p256dh: sub.p256dh, p_auth: sub.auth, p_ua: request.headers.get("user-agent") || "", p_tz: tz });
     return json({ ok: true });
   },
   // Big-story alerts for people without an account. The device keeps its own random key to turn them off.
-  async "POST push/guest"({ env, request }) {
+  async "POST push/guest"({ env, request, log }) {
     const b = await body(request);
     const sub = pushSub(b.subscription);
     if (!sub || typeof b.key !== "string" || !/^[A-Za-z0-9_-]{32,64}$/.test(b.key)) return json({ error: "This browser's notification service is not supported." }, 400);
-    if (!(await allow(env, "guestpush:" + clientIp(request), 20, 3600))) return json({ error: "Too many tries. Try again later." }, 429);
+    if (!(await allow(env, "guestpush:" + clientIp(request), 20, 3600))) { log("rate_limited", { route: "guest_push" }); return json({ error: "Too many tries. Try again later." }, 429); }
+    log(b.on === false ? "guest_push_off" : "guest_push_on", { host: new URL(sub.endpoint).hostname });
     await rpc(env, "tangent_guest_push", { p_endpoint: sub.endpoint, p_p256dh: sub.p256dh, p_auth: sub.auth, p_ua: request.headers.get("user-agent") || "", p_tz: timeZone(b.tz), p_key: b.key, p_on: b.on !== false });
     return json({ ok: true });
   },
@@ -265,6 +281,41 @@ const routes = {
     const b = await body(request);
     if (typeof b.endpoint === "string") await rpc(env, "tangent_push_unsubscribe", { p_user: user.id, p_endpoint: b.endpoint });
     return json({ ok: true });
+  },
+
+  // ---- admin (the database checks is_admin again on every call) ----
+  async "GET admin/overview"({ env, user }) {
+    return json(await rpc(env, "tangent_admin_overview", { p_admin: user.id }));
+  },
+  async "GET admin/users"({ env, request, user }) {
+    const q = new URL(request.url).searchParams;
+    return json(await rpc(env, "tangent_admin_users", { p_admin: user.id, p_q: (q.get("q") || "").slice(0, 100), p_limit: 100, p_offset: +q.get("offset") || 0 }));
+  },
+  async "GET admin/log"({ env, request, user }) {
+    const q = new URL(request.url).searchParams;
+    return json(await rpc(env, "tangent_admin_log", { p_admin: user.id, p_kind: (q.get("kind") || "").slice(0, 40), p_q: (q.get("q") || "").slice(0, 100), p_before: +q.get("before") || null, p_limit: 150 }));
+  },
+  async "GET admin/sources"({ env, user }) {
+    return json(await rpc(env, "tangent_admin_sources", { p_admin: user.id }));
+  },
+  async "POST admin/user"({ env, request, user, log }) {
+    const b = await body(request);
+    if (!/^[0-9a-f-]{36}$/.test(b.id || "")) return json({ error: "Bad user." }, 400);
+    await rpc(env, "tangent_admin_user_action", { p_admin: user.id, p_user: b.id, p_action: String(b.action) });
+    log("admin_action", { target: "user", id: b.id, action: b.action });
+    return json({ ok: true });
+  },
+  async "POST admin/source"({ env, request, user, log }) {
+    const b = await body(request);
+    await rpc(env, "tangent_admin_source_action", { p_admin: user.id, p_source: +b.id, p_action: String(b.action), p_note: typeof b.note === "string" ? b.note.slice(0, 200) : null });
+    log("admin_action", { target: "source", id: +b.id, action: b.action });
+    return json({ ok: true });
+  },
+  async "POST admin/suggestion"({ env, request, user, log }) {
+    const b = await body(request);
+    const r = await rpc(env, "tangent_admin_suggestion", { p_admin: user.id, p_id: +b.id, p_action: String(b.action) });
+    log("admin_action", { target: "suggestion", id: +b.id, action: b.action });
+    return json({ result: r });
   },
 
   // ---- votes and hides ----
@@ -283,6 +334,12 @@ const PUBLIC = new Set(["POST push/guest", "POST auth/signup", "POST auth/login"
 
 export async function onRequest(context) {
   const { request, env, params } = context;
+  // Fire-and-forget event log; a logging failure never breaks the request.
+  let who = null;
+  const log = (kind, detail = {}, user = who) => {
+    const p = rpc(env, "tangent_log", { p_kind: kind, p_user: user?.id ?? null, p_ip: clientIp(request), p_ua: request.headers.get("user-agent") || "", p_detail: detail }).catch(() => {});
+    context.waitUntil?.(p);
+  };
   const path = (params.path || []).join("/");
   const key = `${request.method} ${path}`;
   const handler = routes[key];
@@ -290,14 +347,16 @@ export async function onRequest(context) {
   if (request.method === "POST" && !sameOrigin(request)) return json({ error: "Cross-site request refused." }, 403);
   try {
     const { sid, user } = await currentUser(env, request);
+    who = user;
     if (!PUBLIC.has(key) && !user) return json({ error: "Please sign in." }, 401, { "set-cookie": signOutCookies() });
     // The device's chosen persona; the database falls back to the first one if it is missing or not theirs.
     const persona = /^\d{1,12}$/.test(request.headers.get("x-persona") || "") ? +request.headers.get("x-persona") : null;
-    return await handler({ env, request, sid, user, persona });
+    return await handler({ env, request, sid, user, persona, log });
   } catch (e) {
     const known = KNOWN[e.message];
-    if (known) return json({ error: known[1] }, known[0]);
+    if (known) { log("refused", { route: key, reason: e.message }); return json({ error: known[1] }, known[0]); }
     console.error(key, e.message);
+    log("server_error", { route: key, message: String(e.message).slice(0, 300) });
     return json({ error: "Something went wrong. Please try again." }, 500);
   }
 }

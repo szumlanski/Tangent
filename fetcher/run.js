@@ -13,6 +13,7 @@ import { alerts } from "./alerts.js";
 import { vetPending, refreshSuggestions } from "./vet.js";
 
 const STRATEGIES = { rss, gnews, gsearch, sitemap, scrape };
+const RUN_START = Date.now();
 // News goes stale fast; videos and blogs post less often.
 // Weekly papers post less often, so news looks back a week; ranking favors fresh stories anyway.
 const MAX_AGE = { search: 3 * 864e5, news: 7 * 864e5, blog: 14 * 864e5, youtube: 14 * 864e5, podcast: 14 * 864e5 };
@@ -179,6 +180,14 @@ await alerts().catch(e => console.warn("alerts:", e.message));
 
 // Suggested sources for shelves that follow a phrase change slowly; refresh them hourly.
 if (new Date().getUTCMinutes() < 15) await refreshSuggestions().catch(e => console.warn("suggestions:", e.message));
+
+// One line per run in the event log, for the admin dashboard.
+const failed = results.filter(r => r.error);
+await db.logEvent("fetch_run", {
+  sources: results.length, failed: failed.length, added: results.reduce((n, r) => n + (r.added || 0), 0),
+  paywalled: results.reduce((n, r) => n + (r.paywalled || 0), 0), seconds: Math.round((Date.now() - RUN_START) / 1000),
+  failing: failed.slice(0, 10).map(r => r.source),
+}).catch(e => console.warn("log:", e.message));
 
 if (process.env.DRY === "1") {
   const rows = db.dryRows;
