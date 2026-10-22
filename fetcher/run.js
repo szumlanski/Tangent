@@ -14,6 +14,7 @@ import { vetPending, refreshSuggestions } from "./vet.js";
 import { retention } from "./retention.js";
 import { signups } from "./signups.js";
 import { skipped } from "./skip.js";
+import { localTopic, isLocal, opening } from "./local.js";
 
 const STRATEGIES = { rss, gnews, gsearch, sitemap, scrape };
 const RUN_START = Date.now();
@@ -23,7 +24,7 @@ const MAX_AGE = { search: 3 * 864e5, news: 7 * 864e5, blog: 14 * 864e5, youtube:
 const MAX_NEW_PER_SOURCE = 15;
 const ROW_DEFAULTS = {
   origin_url: null, excerpt: null, image: null, author: null, body_html: null, word_count: null,
-  extracted: false, paywalled: false, paywall_reason: null, video_id: null, locked: false,
+  extracted: false, paywalled: false, paywall_reason: null, video_id: null, locked: false, offtopic: false,
 };
 
 // Try each strategy in order; the first that returns items wins.
@@ -129,6 +130,10 @@ async function processSourceInner(source) {
       if (bare(row.title).length < 8) continue;
       row.excerpt = plain(row.excerpt)?.slice(0, 400) || null;
       if (!row.title) continue;
+      const local = localTopic(source);
+      if (local && !isLocal(local, row.title, row.excerpt, opening(row.body_html))) {
+        Object.assign(row, { offtopic: true, body_html: null, word_count: null, extracted: false });
+      }
       rows.push(row);
     } catch (e) {
       console.warn(`  ${source.name}: ${it.url}: ${e.message}`);
@@ -200,7 +205,8 @@ await db.logEvent("fetch_run", {
 
 if (process.env.DRY === "1") {
   const rows = db.dryRows;
-  console.log(`\nDRY: ${rows.length} rows, ${rows.filter(r => r.extracted).length} full text, ${rows.filter(r => r.paywalled).length} paywalled`);
+  console.log(`\nDRY: ${rows.length} rows, ${rows.filter(r => r.extracted).length} full text, ${rows.filter(r => r.paywalled).length} paywalled, ${rows.filter(r => r.offtopic).length} off topic`);
+  for (const r of rows.filter(r => r.offtopic)) console.log(`  off topic: ${r.title}`);
   for (const r of rows.filter(r => r.paywalled)) console.log(`  locked (${r.paywall_reason}): ${r.url}`);
   if (process.env.DRY_OUT) (await import("node:fs")).writeFileSync(process.env.DRY_OUT, JSON.stringify(rows));
 }

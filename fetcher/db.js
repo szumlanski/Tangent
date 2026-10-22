@@ -95,7 +95,7 @@ export const setConfig = (k, v) => rest("tangent_config?on_conflict=k", { method
 export const pushSubs = async () => DRY ? [] : rest("tangent_push_subs?disabled_at=is.null&select=id,user_id,endpoint,p256dh,auth,tz");
 export const newArticles = async (cursor, since) => (await rest(
   `tangent_articles?select=id,title,excerpt,source_id,cluster_id,published_at,fetched_at,tangent_sources!inner(name)` +
-  `&paywalled=is.false&tangent_sources.enabled=is.true&fetched_at=gt.${encodeURIComponent(cursor)}&published_at=gt.${encodeURIComponent(since)}&order=fetched_at.asc&limit=1000`))
+  `&paywalled=is.false&offtopic=is.false&tangent_sources.enabled=is.true&fetched_at=gt.${encodeURIComponent(cursor)}&published_at=gt.${encodeURIComponent(since)}&order=fetched_at.asc&limit=1000`))
   .map(({ tangent_sources, ...a }) => ({ ...a, source_name: tangent_sources?.name || "" }));
 export const storyMembers = ids =>
   rest(`tangent_feed?cluster_id=in.${inList(ids)}&select=id,title,source_id,source_name,cluster_id,published_at,image,story_headline&limit=3000`);
