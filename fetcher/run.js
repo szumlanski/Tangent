@@ -22,6 +22,7 @@ import { seedPlaces } from "./places.js";
 import { quality } from "./quality.js";
 
 const STRATEGIES = { rss, gnews, gsearch, sitemap, scrape, ytsearch, hnsearch, redditsearch };
+const DISCOVERY = new Set(["ytsearch", "hnsearch", "redditsearch"]);
 const RUN_START = Date.now();
 // News goes stale fast; videos and blogs post less often.
 // Weekly papers post less often, so news looks back a week; ranking favors fresh stories anyway.
@@ -41,7 +42,8 @@ async function discover(source) {
     if (name === "rss" && !source.feed_url) continue;
     try {
       const items = await STRATEGIES[name](source);
-      if (items.length) return { strategy: name, items };
+      // A discovery search with no results this week is normal, not a broken source.
+      if (items.length || DISCOVERY.has(name)) return { strategy: name, items };
       errors.push(`${name}: empty`);
     } catch (e) {
       errors.push(`${name}: ${e.message}`);
