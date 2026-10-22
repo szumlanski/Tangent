@@ -1,6 +1,6 @@
 // Cache the whole app on install so it opens instantly and works offline.
 // Page files are served from cache first and refreshed in the background.
-const CACHE = "tangent-v38";
+const CACHE = "tangent-v39";
 const ASSETS = [
   "./",
   "help",

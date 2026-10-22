@@ -206,6 +206,25 @@ const routes = {
     if (!Number.isInteger(offset) || offset < 0 || offset > 500) return json({ error: "Bad offset." }, 400);
     return json({ items: await rpc(env, "tangent_shelf_rank", { p_user: user.id, p_shelf: shelf, p_offset: offset, p_limit: 100 }) });
   },
+  // "Not about this shelf": the story (and look-alikes) leave that shelf. undo puts it back.
+  async "POST shelves/reject"({ env, request, user, log }) {
+    const b = await body(request);
+    if (!Number.isInteger(b.shelf) || !Number.isInteger(b.article)) return json({ error: "Not found." }, 404);
+    await rpc(env, "tangent_shelf_reject", { p_user: user.id, p_shelf: b.shelf, p_article: b.article, p_undo: !!b.undo });
+    log("shelf_reject", { shelf: b.shelf, article: b.article, undo: !!b.undo });
+    return json({ ok: true });
+  },
+  // Hide a source everywhere for this persona (undo shows it again).
+  async "POST sources/mute"({ env, request, user, persona, log }) {
+    const b = await body(request);
+    if (!Number.isInteger(b.source)) return json({ error: "Not found." }, 404);
+    await rpc(env, "tangent_mute_source", { p_user: user.id, p_persona: persona, p_source: b.source, p_undo: !!b.undo });
+    log("source_mute", { source: b.source, undo: !!b.undo });
+    return json({ ok: true });
+  },
+  async "GET sources/mutes"({ env, user, persona }) {
+    return json({ sources: await rpc(env, "tangent_mutes_get", { p_user: user.id, p_persona: persona }) });
+  },
   // Outlets the fetcher found covering a shelf's phrase (the app adds catalog suggestions itself).
   async "GET shelves/suggestions"({ env, request, user }) {
     const shelf = +new URL(request.url).searchParams.get("shelf");

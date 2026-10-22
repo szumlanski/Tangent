@@ -148,6 +148,8 @@ a { color: inherit; }
 .rbar { flex: none; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: env(safe-area-inset-top, 0px) 4px 0; height: calc(52px + env(safe-area-inset-top, 0px)); background: var(--bar); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border-bottom: 0.5px solid var(--sep); }
 .rbar .pill { height: 36px; padding: 0 14px; margin-right: 8px; border-radius: 18px; background: var(--label); color: var(--bg); font-size: 15px; font-weight: 600; display: inline-flex; align-items: center; text-decoration: none; }
 .rbody .why { margin: 6px 0 0; font-size: 14px; color: var(--label-2); }
+.rbody .teach { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+.rbody .teach button { min-height: 44px; padding: 0 14px; border-radius: 22px; background: var(--card); border: 1px solid var(--sep); color: var(--label); font-size: 15px; font-weight: 600; }
 .rbody { max-width: 680px; margin: 0 auto; padding: 20px 20px calc(60px + env(safe-area-inset-bottom, 0px)); }
 .rbody .hero { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 12px; background: #2a2d33; display: block; }
 .rbody .video { width: 100%; aspect-ratio: 16/9; border: 0; border-radius: 12px; display: block; background: #000; }
@@ -869,7 +871,10 @@ async function openReader(id, swap = false) {
   const also = others.length
     ? `<section class="also"><div class="sum-h">Also covered by</div>${others.map(o => `<button data-open="${o.id}"><b>${esc(o.source_name)}</b><span>${esc(o.title)}</span></button>`).join("")}</section>` : "";
   const why = it.why ? `<p class="why">Why you're seeing this: ${esc(it.why)}</p>` : "";
-  body.innerHTML = `${top}<h1>${esc(it.title)}</h1>${meta}${why}${sum}${also}<div id="rText">${!sum && it.excerpt ? `<p class="teaser">${esc(it.excerpt)}</p>` : ""}</div>`;
+  // Teach the shelf: drop this story (and look-alikes) from the shelf, or stop seeing the source.
+  const shelfTab = signedIn() && curTab().key ? curTab() : null;
+  const ctl = signedIn() ? `<div class="teach">${shelfTab ? `<button data-reject="${it.id}" data-shelf="${shelfTab.key.slice(1)}">Not about ${esc(shelfTab.label)}</button>` : ""}<button data-mute="${it.source_id}">Hide ${esc(it.source_name)}</button></div>` : "";
+  body.innerHTML = `${top}<h1>${esc(it.title)}</h1>${meta}${why}${ctl}${sum}${also}<div id="rText">${!sum && it.excerpt ? `<p class="teaser">${esc(it.excerpt)}</p>` : ""}</div>`;
   r.hidden = false; $("rScroll").scrollTop = 0;
   requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add("open")));
   document.body.style.overflow = "hidden";
@@ -917,6 +922,26 @@ $("rClose").addEventListener("click", () => closeReader(false));
 $("rBody").addEventListener("click", e => {
   const b = e.target.closest("[data-open]");
   if (b) openReader(+b.dataset.open, true);
+});
+// "Not about this shelf" and "Hide this source": instant here, remembered on the server, with undo.
+$("rBody").addEventListener("click", async e => {
+  const rj = e.target.closest("[data-reject]"), mu = e.target.closest("[data-mute]");
+  if (!rj && !mu) return;
+  try {
+    if (rj) {
+      const shelf = +rj.dataset.shelf, article = +rj.dataset.reject, label = curTab().label;
+      await api("shelves/reject", { shelf, article });
+      shelfMembers.get(shelf)?.delete(article);
+      closeReader(false); rerender(); load();
+      toast(`Removed from ${label}. Similar stories will stay off it too.`, async () => { await api("shelves/reject", { shelf, article, undo: true }); load(); });
+    } else {
+      const source = +mu.dataset.mute, name = state.items.find(i => i.source_id === source)?.source_name || "this source";
+      await api("sources/mute", { source });
+      mutedSources.add(source); store.set("muted", [...mutedSources]);
+      closeReader(false); rerender(); load();
+      toast(`${name} hidden.`, async () => { await api("sources/mute", { source, undo: true }); mutedSources.delete(source); store.set("muted", [...mutedSources]); rerender(); load(); });
+    }
+  } catch (x) { toast(x.message); }
 });
 addEventListener("popstate", () => {
   if (ownBack) { ownBack = false; return; }
@@ -1278,7 +1303,8 @@ function prefScore(it) {
   // Source and headline words carry most of it; topic and format only lean.
   return 0.5 * p("s" + it.source_id) + 0.15 * p("t" + it.topic) + 0.1 * p("k" + it.kind) + 0.4 * words;
 }
-const isHidden = it => hiddenArticles.has(it.id) || (it.cluster_id && hiddenStories.has(it.cluster_id)) || (hiddenRepeats.size > 0 && hiddenRepeats.has(repeatKey(it.title)));
+let mutedSources = new Set(store.get("muted", []));
+const isHidden = it => mutedSources.has(it.source_id) || hiddenArticles.has(it.id) || (it.cluster_id && hiddenStories.has(it.cluster_id)) || (hiddenRepeats.size > 0 && hiddenRepeats.has(repeatKey(it.title)));
 
 async function saveFeedback(it, change) {
   let row = feedback.find(r => r.article_id === it.id);
@@ -1409,7 +1435,7 @@ async function loadMe() {
   attachPush();
 }
 function signedOutHere() {
-  for (const k of ["me", "feedback", "feed", "persona", "shelfMembers"]) store.del(k);
+  for (const k of ["me", "feedback", "feed", "persona", "shelfMembers", "muted"]) store.del(k);
   me = null; feedback = []; learn();
   if (!/(^|;\s*)tg_guest=1/.test(document.cookie)) location.replace("/welcome");
   else { renderAcctBtn(); renderTabs(); load(); }
@@ -1523,7 +1549,7 @@ function openDelete() {
 }
 
 function leave() {
-  for (const k of ["me", "feedback", "feed", "persona", "shelfMembers"]) store.del(k);
+  for (const k of ["me", "feedback", "feed", "persona", "shelfMembers", "muted"]) store.del(k);
   location.replace("/welcome");
 }
 async function signOut(all) {
@@ -1548,6 +1574,7 @@ async function switchPersona(id) {
   store.set("persona", id);
   feedback = []; store.del("feedback"); learn();
   shelfMembers = new Map(); store.del("shelfMembers");
+  mutedSources = new Set(); store.del("muted");
   state.topic = ""; store.set("topic", "");
   try { setMe(await api("me")); } catch (x) { toast(x.message); return; }
   $("stocksView").dataset.built = ""; $("sportsView").dataset.built = "";
