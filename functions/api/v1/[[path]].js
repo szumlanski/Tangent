@@ -199,6 +199,13 @@ const routes = {
     if (before && Number.isNaN(Date.parse(before))) return json({ error: "Bad date." }, 400);
     return json({ items: await rpc(env, "tangent_shelf_feed", { p_user: user.id, p_shelf: shelf, p_before: before || null, p_limit: 100 }) });
   },
+  // One shelf's stories ranked for its interest from the whole pool, each with a reason ("why").
+  async "GET shelves/rank"({ env, request, user }) {
+    const q = new URL(request.url).searchParams, shelf = +q.get("shelf"), offset = +(q.get("offset") || 0);
+    if (!Number.isInteger(shelf) || shelf < 1) return json({ error: "Not found." }, 404);
+    if (!Number.isInteger(offset) || offset < 0 || offset > 500) return json({ error: "Bad offset." }, 400);
+    return json({ items: await rpc(env, "tangent_shelf_rank", { p_user: user.id, p_shelf: shelf, p_offset: offset, p_limit: 100 }) });
+  },
   // Outlets the fetcher found covering a shelf's phrase (the app adds catalog suggestions itself).
   async "GET shelves/suggestions"({ env, request, user }) {
     const shelf = +new URL(request.url).searchParams.get("shelf");

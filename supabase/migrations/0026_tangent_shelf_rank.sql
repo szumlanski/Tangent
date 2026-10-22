@@ -2,7 +2,8 @@
 --   recall:   nearest by meaning to the interest (HNSW) ∪ keyword hits on the phrase ∪ the shelf's own sources
 --   relevant: similarity (plus a bonus for a keyword hit or a chosen source) above the interest's bar
 --   score:    relevance × quality × freshness (news halves in a day, video and blogs slower) × story size
---   then one card per story cluster, and a gentle per-source penalty so no outlet floods the shelf.
+--   then one card per story (same cluster or near-identical meaning), and a gentle per-source penalty
+--   so no outlet floods the shelf. Phrase shelves need a stricter meaning match when the phrase is not named.
 -- Follow-mode shelves (regional) and interests without a vector yet fall back to tangent_shelf_feed.
 -- Returns a JSON array of feed rows, each with "why" and "score".
 create or replace function public.tangent_shelf_rank(p_secret text, p_user uuid, p_shelf bigint, p_offset int, p_limit int)
@@ -43,7 +44,7 @@ begin
     order by a.published_at desc limit 400
   ), cand as (select id from ann union select id from kw union select id from pin),
   scored as (
-    select f.*, a.quality, a.flags,
+    select f.*, a.quality, a.flags, a.emb, a.topics,
       coalesce(1 - (a.emb operator(extensions.<=>) it.vec), 0)::real as sim,
       (tsq is not null and a.fts @@ tsq) as kwhit,
       exists (select 1 from pin where pin.id = a.id) as pinned
@@ -58,25 +59,38 @@ begin
       sqrt(greatest(r.relevance - it.min_sim + 0.05, 0))
       * coalesce(r.quality, 1)
       * exp(-ln(2) * extract(epoch from now() - r.published_at) / 3600 / case when r.kind in ('youtube', 'blog', 'podcast') then 72 else 24 end)
-      * (1 + 0.2 * ln(greatest(coalesce(r.story_size, 1), 1))) as score0
+      * (1 + 0.2 * ln(greatest(coalesce(r.story_size, 1), 1)))
+      -- hyper-local items (school sports, town boards, obituaries) rank low unless the shelf names them;
+      -- regional shelves follow their own sources and never get here
+      * case when not r.kwhit and (r.topics && array['hs-sports', 'local-gov', 'obituaries', 'arts-events'] or r.title ~* '\mhigh school\M')
+          then 0.35 else 1 end as score0
     from rel r
     where r.relevance >= it.min_sim
+      -- on a phrase shelf, a story that never names the phrase must be clearly about it
+      and (r.kwhit or it.kind <> 'phrase' or r.sim >= it.min_sim + 0.12)
       -- a phrase shelf without a vector yet relies on keyword hits only
       and (it.vec is not null or r.kwhit)
+  ), top as (
+    select o.* from ok o order by o.score0 desc limit 400
   ), one as (
-    select o.*, row_number() over (partition by coalesce(o.cluster_id, -o.id) order by o.score0 desc) as crn from ok o
+    -- one card per story: the same cluster, or near-identical meaning (the same news from several outlets)
+    select t.*, (select count(*) from top u where u.id <> t.id and (u.cluster_id = t.cluster_id
+        or (u.emb is not null and t.emb is not null and (u.emb operator(extensions.<=>) t.emb) < 0.2))) + 1 as dupes
+    from top t
+    where not exists (select 1 from top u where (u.score0 > t.score0 or (u.score0 = t.score0 and u.id < t.id))
+      and (u.cluster_id = t.cluster_id or (u.emb is not null and t.emb is not null and (u.emb operator(extensions.<=>) t.emb) < 0.2)))
   ), div as (
     select o.*, o.score0 * power(0.85, row_number() over (partition by o.source_id order by o.score0 desc) - 1) as score
-    from one o where o.crn = 1
+    from one o
   ), page as (
     select d.* from div d order by d.score desc offset greatest(coalesce(p_offset, 0), 0) limit least(greatest(coalesce(p_limit, 40), 1), 100)
   )
   select coalesce(jsonb_agg(
-    (to_jsonb(p) - array['quality', 'flags', 'sim', 'kwhit', 'pinned', 'relevance', 'score0', 'crn'])
+    (to_jsonb(p) - array['quality', 'flags', 'emb', 'topics', 'sim', 'kwhit', 'pinned', 'relevance', 'score0', 'dupes'])
     || jsonb_build_object('score', round(p.score::numeric, 4), 'why',
       concat_ws(' · ',
         case when p.kwhit then 'Mentions ' || it.label else 'About ' || it.label end,
-        case when coalesce(p.story_size, 1) > 2 then p.story_size || ' outlets' end,
+        case when greatest(coalesce(p.story_size, 1), p.dupes) > 2 then greatest(coalesce(p.story_size, 1), p.dupes) || ' outlets' end,
         case when p.pinned then 'a source on this shelf' end))
     order by p.score desc), '[]') into out
   from page p;

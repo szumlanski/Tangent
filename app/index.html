@@ -147,6 +147,7 @@ a { color: inherit; }
 .reader.open { transform: none; }
 .rbar { flex: none; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: env(safe-area-inset-top, 0px) 4px 0; height: calc(52px + env(safe-area-inset-top, 0px)); background: var(--bar); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border-bottom: 0.5px solid var(--sep); }
 .rbar .pill { height: 36px; padding: 0 14px; margin-right: 8px; border-radius: 18px; background: var(--label); color: var(--bg); font-size: 15px; font-weight: 600; display: inline-flex; align-items: center; text-decoration: none; }
+.rbody .why { margin: 6px 0 0; font-size: 14px; color: var(--label-2); }
 .rbody { max-width: 680px; margin: 0 auto; padding: 20px 20px calc(60px + env(safe-area-inset-bottom, 0px)); }
 .rbody .hero { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 12px; background: #2a2d33; display: block; }
 .rbody .video { width: 100%; aspect-ratio: 16/9; border: 0; border-radius: 12px; display: block; background: #000; }
@@ -536,7 +537,8 @@ function visible() {
   // Freshness decays over about a day and a half; your votes shift a story by hours, not days:
   // 3 thumbs-down on a source is like its stories being ~3 hours older, 10 is ~7 hours.
   const now = Date.now();
-  for (const c of cards) c.rank = Math.exp(-(now - Date.parse(c.newest)) / 36e5 / 36) * Math.exp(0.4 * prefScore(c));
+  // Server-ranked stories (shelves) carry a score for relevance, quality and freshness; others rank by age.
+  for (const c of cards) c.rank = (c.score != null ? Math.max(...c.members.map(m => m.score || 0)) * 1.5 : Math.exp(-(now - Date.parse(c.newest)) / 36e5 / 36)) * Math.exp(0.4 * prefScore(c));
   cards.sort((a, b) => b.rank - a.rank);
   return diversify(cards);
 }
@@ -789,9 +791,14 @@ function phraseMatcher(q) {
 }
 const curTab = () => tabs().find(t => t.key === state.topic) || tabs()[0];
 let allIds = new Set();
+// Which stories belong on which shelf is decided by the server (tangent_shelf_rank); the source and
+// phrase rules below only cover a shelf that has not loaded from the server yet.
+let shelfMembers = new Map(Object.entries(store.get("shelfMembers", {})).map(([k, v]) => [+k, new Set(v)]));
 function inTab(i, t) {
+  const m = t.key ? shelfMembers.get(+t.key.slice(1)) : null;
+  if (m) return m.has(i.id);
   if (t.ids) return t.ids.has(i.source_id) && (!t.match || i.kind === "blog" || t.match(i));
-  if (!t.key) return hasShelves() ? allIds.has(i.source_id) : i.topic !== "sports";
+  if (!t.key) return hasShelves() ? allIds.has(i.source_id) || [...shelfMembers.values()].some(x => x.has(i.id)) : i.topic !== "sports";
   return i.topic === t.key;
 }
 function renderTabs() {
@@ -861,7 +868,8 @@ async function openReader(id, swap = false) {
     ? `<section class="sum"><div class="sum-h">Summary${it.story_size > 1 ? ` · from ${it.story_size} outlets` : ""}</div><ul>${it.bullets.map(b => `<li>${esc(b)}</li>`).join("")}</ul></section>` : "";
   const also = others.length
     ? `<section class="also"><div class="sum-h">Also covered by</div>${others.map(o => `<button data-open="${o.id}"><b>${esc(o.source_name)}</b><span>${esc(o.title)}</span></button>`).join("")}</section>` : "";
-  body.innerHTML = `${top}<h1>${esc(it.title)}</h1>${meta}${sum}${also}<div id="rText">${!sum && it.excerpt ? `<p class="teaser">${esc(it.excerpt)}</p>` : ""}</div>`;
+  const why = it.why ? `<p class="why">Why you're seeing this: ${esc(it.why)}</p>` : "";
+  body.innerHTML = `${top}<h1>${esc(it.title)}</h1>${meta}${why}${sum}${also}<div id="rText">${!sum && it.excerpt ? `<p class="teaser">${esc(it.excerpt)}</p>` : ""}</div>`;
   r.hidden = false; $("rScroll").scrollTop = 0;
   requestAnimationFrame(() => requestAnimationFrame(() => r.classList.add("open")));
   document.body.style.overflow = "hidden";
@@ -1401,7 +1409,7 @@ async function loadMe() {
   attachPush();
 }
 function signedOutHere() {
-  for (const k of ["me", "feedback", "feed", "persona"]) store.del(k);
+  for (const k of ["me", "feedback", "feed", "persona", "shelfMembers"]) store.del(k);
   me = null; feedback = []; learn();
   if (!/(^|;\s*)tg_guest=1/.test(document.cookie)) location.replace("/welcome");
   else { renderAcctBtn(); renderTabs(); load(); }
@@ -1515,7 +1523,7 @@ function openDelete() {
 }
 
 function leave() {
-  for (const k of ["me", "feedback", "feed", "persona"]) store.del(k);
+  for (const k of ["me", "feedback", "feed", "persona", "shelfMembers"]) store.del(k);
   location.replace("/welcome");
 }
 async function signOut(all) {
@@ -1539,6 +1547,7 @@ async function switchPersona(id) {
   if (id === me.persona) return;
   store.set("persona", id);
   feedback = []; store.del("feedback"); learn();
+  shelfMembers = new Map(); store.del("shelfMembers");
   state.topic = ""; store.set("topic", "");
   try { setMe(await api("me")); } catch (x) { toast(x.message); return; }
   $("stocksView").dataset.built = ""; $("sportsView").dataset.built = "";
@@ -2065,8 +2074,10 @@ async function load() {
     // Each topic loads its own newest stories, so a quiet topic (Vermont) is never crowded
     // out by a busy one (sports videos). Bodies are not in the feed, so this stays light.
     // With shelves, each shelf loads by its own sources. Sports always loads for the Sports tab.
-    // Shelves come from the server already filtered (a phrase shelf keeps only stories about it).
-    const shelfLists = hasShelves() ? me.shelves.filter(s => s.sources.length).map(s => api(`shelves/feed?shelf=${s.id}`).then(r => r.items).catch(() => [])) : [];
+    // Each shelf comes from the server ranked for its interest, from any source in the pool.
+    const members = {};
+    const shelfLists = hasShelves() ? me.shelves.map(s => api(`shelves/rank?shelf=${s.id}`)
+      .then(r => { members[s.id] = r.items.map(x => x.id); return r.items; }).catch(() => [])) : [];
     const queries = (hasShelves() ? [] : TOPICS.map(t => t[0]).filter(Boolean).map(t => `topic=eq.${t}&limit=80`)).concat("topic=eq.sports&limit=60");
     const lists = await Promise.all([...shelfLists, ...queries.map(q => sb(`tangent_feed?select=*&${q}&order=published_at.desc`))]);
     const seen = new Set();
@@ -2074,6 +2085,7 @@ async function load() {
     for (const r of lists.flat()) if (r.kind === "search" && r.author) r.source_name = r.author;
     const rows = lists.flat().filter(r => !seen.has(r.id) && seen.add(r.id)).sort((a, b) => b.published_at.localeCompare(a.published_at));
     state.items = rows;
+    if (hasShelves()) { shelfMembers = new Map(Object.entries(members).map(([k, v]) => [+k, new Set(v)])); store.set("shelfMembers", members); }
     store.set("feed", rows);
     if (view === "news") render();
     if (view === "sports" && $("sportsView").dataset.built) renderSports();
