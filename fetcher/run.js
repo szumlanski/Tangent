@@ -4,6 +4,7 @@ import { rss } from "./strategies/rss.js";
 import { gnews, gsearch, decode } from "./strategies/gnews.js";
 import { sitemap } from "./strategies/sitemap.js";
 import { scrape } from "./strategies/scrape.js";
+import { ytsearch, hnsearch, redditsearch } from "./strategies/discover.js";
 import { extract, plain } from "./extract.js";
 import { isBlockedDomain } from "./paywall.js";
 import * as db from "./db.js";
@@ -18,7 +19,7 @@ import { localTopic, isLocal, opening } from "./local.js";
 import { enrich } from "./enrich.js";
 import { refreshInterests } from "./interests.js";
 
-const STRATEGIES = { rss, gnews, gsearch, sitemap, scrape };
+const STRATEGIES = { rss, gnews, gsearch, sitemap, scrape, ytsearch, hnsearch, redditsearch };
 const RUN_START = Date.now();
 // News goes stale fast; videos and blogs post less often.
 // Weekly papers post less often, so news looks back a week; ranking favors fresh stories anyway.
@@ -26,12 +27,13 @@ const MAX_AGE = { search: 3 * 864e5, news: 7 * 864e5, blog: 14 * 864e5, youtube:
 const MAX_NEW_PER_SOURCE = 15;
 const ROW_DEFAULTS = {
   origin_url: null, excerpt: null, image: null, author: null, body_html: null, word_count: null,
-  extracted: false, paywalled: false, paywall_reason: null, video_id: null, locked: false, offtopic: false,
+  extracted: false, paywalled: false, paywall_reason: null, video_id: null, locked: false, offtopic: false, engagement: null,
 };
 
 // Try each strategy in order; the first that returns items wins.
 async function discover(source) {
-  const order = source.kind === "youtube" ? ["rss"] : source.strategies;
+  // Channels read their feed; YouTube discovery (no feed) uses its search strategy.
+  const order = source.kind === "youtube" && source.feed_url ? ["rss"] : source.strategies;
   const errors = [];
   for (const name of order) {
     if (name === "rss" && !source.feed_url) continue;
@@ -87,6 +89,7 @@ async function processSourceInner(source) {
         excerpt: it.excerpt || null,
         image: /^https?:\/\//.test(it.image || "") ? it.image : null,
         author: it.author || null,
+        engagement: it.engagement ?? null,
         published_at: it.published ? new Date(it.published).toISOString() : started,
       };
       if (source.kind === "youtube") {
@@ -175,6 +178,8 @@ await vetPending().catch(e => console.warn("vet:", e.message));
 const trends = new Date().getUTCMinutes() < 15 || process.env.TRENDS === "1"
   ? collectTrends().then(db.saveTrends).catch(e => console.warn("trends:", e.message))
   : Promise.resolve();
+// Discovery feeds (YouTube search, Hacker News) for every followed phrase.
+await db.ensureDiscovery().catch(e => console.warn("discovery:", e.message));
 const all = await db.sources();
 const only = process.argv[2];
 const list = only ? all.filter(s => s.name.toLowerCase().includes(only.toLowerCase())) : all;

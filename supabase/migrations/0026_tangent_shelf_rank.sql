@@ -44,7 +44,7 @@ begin
     order by a.published_at desc limit 400
   ), cand as (select id from ann union select id from kw union select id from pin),
   scored as (
-    select f.*, a.quality, a.flags, a.emb, a.topics,
+    select f.*, a.quality, a.flags, a.emb, a.topics, a.engagement,
       coalesce(1 - (a.emb operator(extensions.<=>) it.vec), 0)::real as sim,
       (tsq is not null and a.fts @@ tsq) as kwhit,
       exists (select 1 from pin where pin.id = a.id) as pinned
@@ -60,6 +60,8 @@ begin
       * coalesce(r.quality, 1)
       * exp(-ln(2) * extract(epoch from now() - r.published_at) / 3600 / case when r.kind in ('youtube', 'blog', 'podcast') then 72 else 24 end)
       * (1 + 0.2 * ln(greatest(coalesce(r.story_size, 1), 1)))
+      -- audience: YouTube views or Hacker News points (discovery feeds), a modest lift
+      * (1 + 0.06 * ln(1 + coalesce(r.engagement, 0)::real / case when r.kind = 'youtube' then 1000 else 10 end))
       -- hyper-local items (school sports, town boards, obituaries) rank low unless the shelf names them;
       -- regional shelves follow their own sources and never get here
       * case when not r.kwhit and (r.topics && array['hs-sports', 'local-gov', 'obituaries', 'arts-events'] or r.title ~* '\mhigh school\M')
@@ -86,7 +88,7 @@ begin
     select d.* from div d order by d.score desc offset greatest(coalesce(p_offset, 0), 0) limit least(greatest(coalesce(p_limit, 40), 1), 100)
   )
   select coalesce(jsonb_agg(
-    (to_jsonb(p) - array['quality', 'flags', 'emb', 'topics', 'sim', 'kwhit', 'pinned', 'relevance', 'score0', 'dupes'])
+    (to_jsonb(p) - array['quality', 'flags', 'emb', 'topics', 'engagement', 'sim', 'kwhit', 'pinned', 'relevance', 'score0', 'dupes'])
     || jsonb_build_object('score', round(p.score::numeric, 4), 'why',
       concat_ws(' · ',
         case when p.kwhit then 'Mentions ' || it.label else 'About ' || it.label end,

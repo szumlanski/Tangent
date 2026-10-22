@@ -2081,8 +2081,8 @@ async function load() {
     const queries = (hasShelves() ? [] : TOPICS.map(t => t[0]).filter(Boolean).map(t => `topic=eq.${t}&limit=80`)).concat("topic=eq.sports&limit=60");
     const lists = await Promise.all([...shelfLists, ...queries.map(q => sb(`tangent_feed?select=*&${q}&order=published_at.desc`))]);
     const seen = new Set();
-    // Stories from a shelf's phrase search credit the outlet that published them.
-    for (const r of lists.flat()) if (r.kind === "search" && r.author) r.source_name = r.author;
+    // Stories from a phrase search or discovery feed credit the outlet or channel that published them.
+    for (const r of lists.flat()) if ((r.kind === "search" || r.site_url?.startsWith("disc:")) && r.author) r.source_name = r.author;
     const rows = lists.flat().filter(r => !seen.has(r.id) && seen.add(r.id)).sort((a, b) => b.published_at.localeCompare(a.published_at));
     state.items = rows;
     if (hasShelves()) { shelfMembers = new Map(Object.entries(members).map(([k, v]) => [+k, new Set(v)])); store.set("shelfMembers", members); }

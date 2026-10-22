@@ -157,4 +157,4 @@ export const setInterestVec = (id, vec) => rest("rpc/tangent_set_interest_vec", 
 // Vectors of recent stories that mention these words, newest first.
 export const recentVectors = async (terms, n) => (await rest(`tangent_articles?select=emb&emb=not.is.null&paywalled=is.false&fts=plfts(english).${encodeURIComponent(terms)}&order=published_at.desc&limit=${n}`))
   .map(r => typeof r.emb === "string" ? JSON.parse(r.emb) : r.emb);
-
+export const ensureDiscovery = () => DRY ? Promise.resolve(0) : rest("rpc/tangent_ensure_discovery", { method: "POST", body: {} });
