@@ -15,6 +15,7 @@ import { retention } from "./retention.js";
 import { signups } from "./signups.js";
 import { skipped } from "./skip.js";
 import { localTopic, isLocal, opening } from "./local.js";
+import { enrich } from "./enrich.js";
 
 const STRATEGIES = { rss, gnews, gsearch, sitemap, scrape };
 const RUN_START = Date.now();
@@ -183,6 +184,9 @@ for (const r of results) console.log(r.error instanceof Error ? `ERR ${r.error.m
 // Group new articles into stories and summarize them (needs ANTHROPIC_API_KEY).
 await stories().catch(e => console.warn("stories:", e.message));
 
+// Meaning vectors, topics, junk flags and quality for new (and backlog) articles; free and local.
+const enriched = await enrich().catch(e => (console.warn("enrich:", e.message), 0));
+
 // Push alerts for what just arrived (local matching, no AI).
 await alerts().catch(e => console.warn("alerts:", e.message));
 
@@ -200,7 +204,7 @@ const failed = results.filter(r => r.error);
 await db.logEvent("fetch_run", {
   sources: results.length, failed: failed.length, added: results.reduce((n, r) => n + (r.added || 0), 0),
   paywalled: results.reduce((n, r) => n + (r.paywalled || 0), 0), seconds: Math.round((Date.now() - RUN_START) / 1000),
-  failing: failed.slice(0, 10).map(r => r.source),
+  failing: failed.slice(0, 10).map(r => r.source), enriched,
 }).catch(e => console.warn("log:", e.message));
 
 if (process.env.DRY === "1") {

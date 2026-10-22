@@ -141,7 +141,13 @@ const count = async (path, opts) => {
   if (!r.ok) throw new Error(`supabase ${opts.method} ${path.split("?")[0]}: ${r.status} ${await r.text()}`);
   return +(r.headers.get("content-range") || "").split("/")[1] || 0;
 };
-export const trimBodies = before => count(`tangent_articles?fetched_at=lt.${before}&body_html=not.is.null`, { method: "PATCH", body: JSON.stringify({ body_html: null }) });
+// Article text and meaning vectors go together after the text window (vectors only feed ranking of recent items).
+export const trimBodies = before => count(`tangent_articles?fetched_at=lt.${before}&or=(body_html.not.is.null,emb.not.is.null)`, { method: "PATCH", body: JSON.stringify({ body_html: null, emb: null }) });
 export const expiredArticles = async n => (await rest(`tangent_expired_articles?select=id&limit=${n}`)).map(r => r.id);
 export const deleteArticles = ids => count(`tangent_articles?id=in.(${ids.join(",")})`, { method: "DELETE" });
 export const trimOlder = (table, col, before) => count(`${table}?${col}=lt.${before}`, { method: "DELETE" });
+
+// ---- enrichment (meaning vectors, topics, flags, quality) ----
+export const unenriched = async limit => DRY ? [] : rest(`tangent_articles?enriched_at=is.null&select=id,url,kind,title,excerpt,image,body_html,word_count,extracted&order=fetched_at.desc&limit=${limit}`);
+export const setEnrichment = rows => rest("rpc/tangent_set_enrichment", { method: "POST", body: { p_rows: rows } });
+
