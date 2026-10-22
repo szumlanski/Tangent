@@ -192,6 +192,13 @@ const routes = {
     await rpc(env, "tangent_order_shelves", { p_user: user.id, p_ids: b.ids });
     return json({ ok: true });
   },
+  // One shelf's stories, newest first, filtered on the server (phrase shelves keep only on-topic items).
+  async "GET shelves/feed"({ env, request, user }) {
+    const q = new URL(request.url).searchParams, shelf = +q.get("shelf"), before = q.get("before");
+    if (!Number.isInteger(shelf) || shelf < 1) return json({ error: "Not found." }, 404);
+    if (before && Number.isNaN(Date.parse(before))) return json({ error: "Bad date." }, 400);
+    return json({ items: await rpc(env, "tangent_shelf_feed", { p_user: user.id, p_shelf: shelf, p_before: before || null, p_limit: 100 }) });
+  },
   // Outlets the fetcher found covering a shelf's phrase (the app adds catalog suggestions itself).
   async "GET shelves/suggestions"({ env, request, user }) {
     const shelf = +new URL(request.url).searchParams.get("shelf");

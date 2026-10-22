@@ -778,7 +778,7 @@ function tabs() {
 }
 // A shelf that follows a phrase only shows news and videos about it, even from general outlets and
 // channels added to it (CBS or AOL on a "Claude tips" shelf would otherwise fill it with all their news).
-// Search feeds and blogs added to the shelf are taken as on topic. Filler words like
+// Blogs added to the shelf are taken as on topic. Filler words like
 // "tips" or "news" are not required; every other word is, as a whole word.
 const PHRASE_FILLER = new Set(["tips", "tip", "news", "latest", "update", "updates", "guide", "guides", "how", "to", "best", "top", "new", "the", "a", "an", "and", "of", "for", "on", "in", "about", "tricks"]);
 function phraseMatcher(q) {
@@ -790,7 +790,7 @@ function phraseMatcher(q) {
 const curTab = () => tabs().find(t => t.key === state.topic) || tabs()[0];
 let allIds = new Set();
 function inTab(i, t) {
-  if (t.ids) return t.ids.has(i.source_id) && (!t.match || i.kind === "search" || i.kind === "blog" || t.match(i));
+  if (t.ids) return t.ids.has(i.source_id) && (!t.match || i.kind === "blog" || t.match(i));
   if (!t.key) return hasShelves() ? allIds.has(i.source_id) : i.topic !== "sports";
   return i.topic === t.key;
 }
@@ -2065,10 +2065,10 @@ async function load() {
     // Each topic loads its own newest stories, so a quiet topic (Vermont) is never crowded
     // out by a busy one (sports videos). Bodies are not in the feed, so this stays light.
     // With shelves, each shelf loads by its own sources. Sports always loads for the Sports tab.
-    const queries = (hasShelves()
-      ? me.shelves.filter(s => s.sources.length).map(s => `source_id=in.(${s.sources.map(x => x.id).join(",")})&limit=160`)
-      : TOPICS.map(t => t[0]).filter(Boolean).map(t => `topic=eq.${t}&limit=80`)).concat("topic=eq.sports&limit=60");
-    const lists = await Promise.all(queries.map(q => sb(`tangent_feed?select=*&${q}&order=published_at.desc`)));
+    // Shelves come from the server already filtered (a phrase shelf keeps only stories about it).
+    const shelfLists = hasShelves() ? me.shelves.filter(s => s.sources.length).map(s => api(`shelves/feed?shelf=${s.id}`).then(r => r.items).catch(() => [])) : [];
+    const queries = (hasShelves() ? [] : TOPICS.map(t => t[0]).filter(Boolean).map(t => `topic=eq.${t}&limit=80`)).concat("topic=eq.sports&limit=60");
+    const lists = await Promise.all([...shelfLists, ...queries.map(q => sb(`tangent_feed?select=*&${q}&order=published_at.desc`))]);
     const seen = new Set();
     // Stories from a shelf's phrase search credit the outlet that published them.
     for (const r of lists.flat()) if (r.kind === "search" && r.author) r.source_name = r.author;
