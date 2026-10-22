@@ -328,6 +328,9 @@ const routes = {
   async "GET admin/overview"({ env, user }) {
     return json(await rpc(env, "tangent_admin_overview", { p_admin: user.id }));
   },
+  async "GET admin/quality"({ env, user }) {
+    return json({ interests: await rpc(env, "tangent_admin_quality", { p_admin: user.id }) });
+  },
   async "GET admin/users"({ env, request, user }) {
     const q = new URL(request.url).searchParams;
     return json(await rpc(env, "tangent_admin_users", { p_admin: user.id, p_q: (q.get("q") || "").slice(0, 100), p_limit: 100, p_offset: +q.get("offset") || 0 }));

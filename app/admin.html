@@ -58,6 +58,7 @@
     <button role="tab" data-tab="log" aria-selected="false">Activity log</button>
     <button role="tab" data-tab="sources" aria-selected="false">Sources</button>
     <button role="tab" data-tab="suggestions" aria-selected="false">Suggestions</button>
+    <button role="tab" data-tab="quality" aria-selected="false">Quality</button>
   </div>
   <div id="view"><p class="msg">Loading…</p></div>
 </main>
@@ -146,6 +147,18 @@ async function sourcesView(reload = true) {
         ${s.status !== "rejected" ? `<button class="bad" data-s="${s.id}" data-a="reject">Remove from catalog</button>` : ""}</div></div>`).join("") || `<p class="msg">Nothing here.</p>`}</div>`;
 }
 
+// Daily check of every followed interest: Claude Haiku rates the top 20 stories its shelf shows.
+async function qualityView() {
+  const { interests } = await api("admin/quality");
+  const pct = x => x == null ? "not checked yet" : Math.round(x * 100) + "% on topic";
+  return `<p class="muted small">Once a day Tangent takes the top 20 stories each shelf would show and has Claude Haiku rate whether they fit. Lowest first. A shelf with fewer than 30 stories gets a longer look-back automatically.</p>
+    <div class="rows">${interests.map(q => `<div class="row"><div class="t"><b>${esc(q.label)}</b><span class="badge">${esc(q.kind)}</span>
+      <span class="badge ${q.precision == null ? "" : q.precision >= 0.85 ? "good" : q.precision < 0.6 ? "bad" : ""}">${pct(q.precision)}</span></div>
+      <div class="m">${q.shelves} ${q.shelves === 1 ? "shelf" : "shelves"} · ${q.available ?? "?"} stories available · looks back ${q.window_days} days${q.at ? " · checked " + ago(q.at) : ""}</div>
+      ${q.sampled ? `<div class="m">${q.good} on topic, ${q.partial} related, ${q.bad} off topic</div>` : ""}
+      ${q.bad_examples?.length ? `<div class="m">Off topic: ${q.bad_examples.map(esc).join(" · ")}</div>` : ""}</div>`).join("") || `<p class="msg">No shelves yet.</p>`}</div>`;
+}
+
 async function suggestionsView() {
   const r = await fetch("https://kyplwgcvbfzyfhiyspsr.supabase.co/rest/v1/tangent_source_suggestions?select=*&order=created_at.desc&limit=50",
     { headers: { apikey: "sb_publishable_LqD81rhJPP9kVN_Rdw22eQ_jhZ3Hc_r", authorization: "Bearer sb_publishable_LqD81rhJPP9kVN_Rdw22eQ_jhZ3Hc_r" } });
@@ -160,7 +173,7 @@ async function show(t) {
   tab = t;
   for (const b of document.querySelectorAll(".tabsbar button")) b.setAttribute("aria-selected", String(b.dataset.tab === t));
   $("view").innerHTML = `<p class="msg">Loading…</p>`;
-  try { $("view").innerHTML = await ({ overview, users: usersView, log: logView, sources: sourcesView, suggestions: suggestionsView })[t](); }
+  try { $("view").innerHTML = await ({ overview, users: usersView, log: logView, sources: sourcesView, suggestions: suggestionsView, quality: qualityView })[t](); }
   catch (e) { $("view").innerHTML = `<p class="msg">${e.message === "Admins only." ? "This page is for Tangent admins. <a href=\"/\">Back to Tangent</a>" : esc(e.message)}</p>`; }
 }
 document.querySelector(".tabsbar").addEventListener("click", e => { const b = e.target.closest("button"); if (b) show(b.dataset.tab); });

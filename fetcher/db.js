@@ -159,3 +159,10 @@ export const recentVectors = async (terms, n) => (await rest(`tangent_articles?s
   .map(r => typeof r.emb === "string" ? JSON.parse(r.emb) : r.emb);
 export const ensureDiscovery = () => DRY ? Promise.resolve(0) : rest("rpc/tangent_ensure_discovery", { method: "POST", body: {} });
 export const insertPlaces = rows => rest("tangent_places", { method: "POST", body: rows, prefer: "return=minimal" });
+// ---- shelf quality checks ----
+export const qualityTargets = () => rest("rpc/tangent_quality_targets", { method: "POST", body: {} });
+// The real ranking, as the shelf's owner would see it (the service role passes the secret check).
+export const rankShelf = (user, shelf, limit) => rest("rpc/tangent_shelf_rank", { method: "POST", body: { p_secret: "", p_user: user, p_shelf: shelf, p_offset: 0, p_limit: limit } });
+export const saveQuality = row => rest("rpc/tangent_quality_save", { method: "POST", body: { p_row: row } });
+export const widenInterest = id => rest("rpc/tangent_interest_widen", { method: "POST", body: { p_id: id } });
+

@@ -19,6 +19,7 @@ import { localTopic, isLocal, opening } from "./local.js";
 import { enrich } from "./enrich.js";
 import { refreshInterests } from "./interests.js";
 import { seedPlaces } from "./places.js";
+import { quality } from "./quality.js";
 
 const STRATEGIES = { rss, gnews, gsearch, sitemap, scrape, ytsearch, hnsearch, redditsearch };
 const RUN_START = Date.now();
@@ -204,6 +205,9 @@ await signups().catch(e => console.warn("signups:", e.message));
 
 // Suggested sources for shelves that follow a phrase change slowly; refresh them hourly.
 if (new Date().getUTCMinutes() < 15) await refreshSuggestions().catch(e => console.warn("suggestions:", e.message));
+
+// Daily shelf quality check (Claude Haiku on 20 stories per followed interest; capped).
+await quality().catch(e => console.warn("quality:", e.message));
 
 // Daily trim of old article text, stories and logs (keeps the shared free database small).
 await retention().catch(e => console.warn("retention:", e.message));
