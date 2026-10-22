@@ -239,6 +239,18 @@ const routes = {
     log("region_add", { label, shelf });
     return json({ shelf });
   },
+  // A starter topic ranked for readers without an account. The same for everyone, so it is cached
+  // at the edge for five minutes.
+  async "GET topics/rank"({ env, request }) {
+    const topic = new URL(request.url).searchParams.get("topic") || "";
+    if (!/^[a-z]{2,20}$/.test(topic)) return json({ error: "Not found." }, 404);
+    const cache = globalThis.caches?.default, key = new Request(`https://tangentreads.com/api/v1/topics/rank?topic=${topic}`);
+    const hit = cache && await cache.match(key);
+    if (hit) return hit;
+    const res = json({ items: await rpc(env, "tangent_topic_rank", { p_topic: topic, p_offset: 0, p_limit: 80 }) }, 200, { "cache-control": "public, max-age=300" });
+    if (cache) await cache.put(key, res.clone()).catch(() => {});
+    return res;
+  },
   // Outlets the fetcher found covering a shelf's phrase (the app adds catalog suggestions itself).
   async "GET shelves/suggestions"({ env, request, user }) {
     const shelf = +new URL(request.url).searchParams.get("shelf");
@@ -374,7 +386,7 @@ const routes = {
   },
 };
 
-const PUBLIC = new Set(["POST push/guest", "POST auth/signup", "POST auth/login", "POST auth/logout", "GET auth/config", "GET auth/google", "GET auth/google/callback"]);
+const PUBLIC = new Set(["GET topics/rank", "POST push/guest", "POST auth/signup", "POST auth/login", "POST auth/logout", "GET auth/config", "GET auth/google", "GET auth/google/callback"]);
 
 export async function onRequest(context) {
   const { request, env, params } = context;
