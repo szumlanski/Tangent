@@ -133,7 +133,7 @@ export async function saveShelfSuggestions(searchSourceId, outlets) {
   if (rows.length) await rest("tangent_shelf_suggestions?on_conflict=shelf_id,domain", { method: "POST", body: rows, prefer: "resolution=merge-duplicates,return=minimal" });
 }
 
-export const logEvent = (kind, detail) => DRY ? null : rest("tangent_events_log", { method: "POST", body: [{ kind, detail }], prefer: "return=minimal" });
+export const logEvent = (kind, detail) => DRY ? Promise.resolve() : rest("tangent_events_log", { method: "POST", body: [{ kind, detail }], prefer: "return=minimal" });
 
 // ---- retention (service key; see retention.js) ----
 const count = async (path, opts) => {
