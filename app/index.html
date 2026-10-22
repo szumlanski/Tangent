@@ -776,8 +776,9 @@ function tabs() {
   if (!hasShelves()) return TOPICS.map(([key, label]) => ({ key, label, topic: key }));
   return [{ key: "", label: "For you" }, ...me.shelves.map(s => ({ key: "s" + s.id, label: s.name, topic: s.topic, ids: new Set(s.sources.map(x => x.id)), match: s.query ? phraseMatcher(s.query) : null }))];
 }
-// A shelf that follows a phrase only shows stories about it, even from general outlets added to it
-// (CBS or AOL on a "Claude tips" shelf would otherwise fill it with all their news). Filler words like
+// A shelf that follows a phrase only shows news and videos about it, even from general outlets and
+// channels added to it (CBS or AOL on a "Claude tips" shelf would otherwise fill it with all their news).
+// Search feeds and blogs added to the shelf are taken as on topic. Filler words like
 // "tips" or "news" are not required; every other word is, as a whole word.
 const PHRASE_FILLER = new Set(["tips", "tip", "news", "latest", "update", "updates", "guide", "guides", "how", "to", "best", "top", "new", "the", "a", "an", "and", "of", "for", "on", "in", "about", "tricks"]);
 function phraseMatcher(q) {
@@ -789,7 +790,7 @@ function phraseMatcher(q) {
 const curTab = () => tabs().find(t => t.key === state.topic) || tabs()[0];
 let allIds = new Set();
 function inTab(i, t) {
-  if (t.ids) return t.ids.has(i.source_id) && (!t.match || i.kind === "search" || t.match(i));
+  if (t.ids) return t.ids.has(i.source_id) && (!t.match || i.kind === "search" || i.kind === "blog" || t.match(i));
   if (!t.key) return hasShelves() ? allIds.has(i.source_id) : i.topic !== "sports";
   return i.topic === t.key;
 }
