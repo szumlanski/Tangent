@@ -225,6 +225,20 @@ const routes = {
   async "GET sources/mutes"({ env, user, persona }) {
     return json({ sources: await rpc(env, "tangent_mutes_get", { p_user: user.id, p_persona: persona }) });
   },
+  // Regions: find a place from what the reader typed, then add it as a local shelf (any number).
+  async "GET regions/search"({ env, request }) {
+    const q = (new URL(request.url).searchParams.get("q") || "").trim().slice(0, 60);
+    if (q.length < 3) return json({ results: [] });
+    return json({ results: await rpc(env, "tangent_region_search", { p_q: q }) });
+  },
+  async "POST regions/add"({ env, request, user, persona, log }) {
+    const b = await body(request);
+    const label = typeof b.label === "string" ? b.label.trim().slice(0, 60) : "";
+    if (!label || !Number.isFinite(b.lat) || !Number.isFinite(b.lon) || !/^[A-Z]{2}$/.test(b.state || "")) return json({ error: "Pick a place from the list." }, 400);
+    const shelf = await rpc(env, "tangent_add_region", { p_user: user.id, p_persona: persona, p_label: label, p_lat: b.lat, p_lon: b.lon, p_state: b.state });
+    log("region_add", { label, shelf });
+    return json({ shelf });
+  },
   // Outlets the fetcher found covering a shelf's phrase (the app adds catalog suggestions itself).
   async "GET shelves/suggestions"({ env, request, user }) {
     const shelf = +new URL(request.url).searchParams.get("shelf");

@@ -310,6 +310,9 @@ details.panel summary { padding: 12px 16px; font-weight: 600; cursor: pointer; m
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chips button { width: 44px; height: 44px; border-radius: 12px; background: var(--card); font-size: 22px; border: 2px solid transparent; }
 .chips button[aria-pressed="true"] { border-color: var(--tint); }
+.chips .chip { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 18px; background: var(--card); border: 1px solid var(--sep); font-size: 15px; font-weight: 600; }
+#rgAdded:empty { display: none; }
+#rgAdded { margin: 4px 0 8px; }
 #pColor button { border-radius: 50%; }
 #pColor button[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--tint); border-color: transparent; }
 .menu li { padding: 0; display: block; }
@@ -1480,7 +1483,11 @@ $("acctBtn").addEventListener("click", openAccount);
 async function openTopics(first) {
   openPanel("shelves", `<h1>${first ? "Pick your shelves" : "Shelves"}</h1>
     ${first ? "" : `<button class="backlink" data-go="shelves">\u2039 Shelves</button>`}<p class="lead">${first ? "Each shelf is a topic with sources already on it. Pick a few to start; you can change them any time." : "Add a topic as a new shelf. Each one comes with vetted sources."}</p>
-    <div class="pick" id="pick">Loading…</div><p class="ferr" id="pickErr" role="alert"></p>
+    <div class="pick" id="pick">Loading…</div>
+    ${first ? `<div class="sec">Anything else you're into?</div>
+    <label class="field"><span>Type a few, separated by commas. Each becomes a shelf.</span><input id="pickFree" maxlength="200" autocomplete="off" placeholder="Claude, pickleball, home solar, F1"></label>
+    <div class="sec">Local news</div>${regionPickerHTML()}` : ""}
+    <p class="ferr" id="pickErr" role="alert"></p>
     <button class="bigbtn primary" id="pickGo" disabled>${first ? "Start reading" : "Add shelves"}</button>
     ${first ? `<button class="bigbtn" id="pickSkip">Skip for now</button>` : ""}`);
   let topics = [];
@@ -1488,17 +1495,22 @@ async function openTopics(first) {
   const have = new Set((me?.shelves || []).map(s => s.topic).filter(Boolean));
   $("pick").innerHTML = topics.map(t => `<button data-slug="${esc(t.slug)}" aria-pressed="${have.has(t.slug) || (first && t.is_default)}" ${have.has(t.slug) ? "disabled" : ""}>
     <b>${esc(t.name)}</b><span>${have.has(t.slug) ? "On your shelves" : esc(t.blurb)}</span><i aria-hidden="true"></i></button>`).join("");
-  const sync = () => { const n = $("pick").querySelectorAll('button[aria-pressed="true"]:not(:disabled)').length; $("pickGo").disabled = !n; if (!first) $("pickGo").textContent = n > 1 ? `Add ${n} shelves` : "Add shelf"; };
+  const free = () => ($("pickFree")?.value || "").split(",").map(x => x.trim()).filter(x => x.length >= 2).slice(0, 8);
+  const sync = () => { const n = $("pick").querySelectorAll('button[aria-pressed="true"]:not(:disabled)').length; $("pickGo").disabled = !n && !free().length && !$("rgAdded")?.children.length; if (!first) $("pickGo").textContent = n > 1 ? `Add ${n} shelves` : "Add shelf"; };
   sync();
+  $("pickFree")?.addEventListener("input", sync);
+  if (first) regionPicker(sync);
   $("pick").addEventListener("click", e => { const b = e.target.closest("button"); if (!b || b.disabled) return; b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")); sync(); });
   $("pickSkip")?.addEventListener("click", () => { store.set("picked:" + me.persona, true); closePanel(false); });
   $("pickGo").addEventListener("click", async () => {
     const slugs = [...$("pick").querySelectorAll('button[aria-pressed="true"]:not(:disabled)')].map(b => b.dataset.slug);
     $("pickGo").disabled = true;
     try {
-      const res = await api("shelves/topics", { topics: slugs });
+      const res = slugs.length ? await api("shelves/topics", { topics: slugs }) : {};
+      for (const phrase of free()) await api("shelves/save", { name: phrase[0].toUpperCase() + phrase.slice(1), query: phrase });
       store.set("picked:" + me.persona, true);
       setMe({ ...me, ...res });
+      if (free().length || !slugs.length) await refreshMe();
       if (first) {
         closePanel(false); toast("You're all set. Change your shelves any time from the account menu.");
         if (launchArticle) setTimeout(() => openArticle(launchArticle), 400); // arrived from a shared link
@@ -1660,7 +1672,9 @@ function openShelves() {
     <div class="sec">Add a shelf</div>
     <form id="nsForm"><label class="field"><span>Follow any topic</span><input id="nsName" maxlength="40" autocomplete="off" placeholder="Woodworking, Red Sox, heat pumps"></label>
     <p class="ferr" id="nsErr" role="alert"></p><button class="bigbtn primary">Create shelf</button></form>
-    <button class="bigbtn" data-go="topics">Add a suggested topic</button>`);
+    <button class="bigbtn" data-go="topics">Add a suggested topic</button>
+    <div class="sec">Add local news</div>${regionPickerHTML()}`);
+  regionPicker(() => openShelves());
   $("nsForm").addEventListener("submit", async e => {
     e.preventDefault();
     const phrase = $("nsName").value.trim();
@@ -1671,6 +1685,42 @@ function openShelves() {
       openShelf(id);
       toast("Shelf created. Its first stories arrive within about 15 minutes.");
     } catch (x) { $("nsErr").textContent = x.message; }
+  });
+}
+
+// Region picker: type a city, county or ZIP, pick a match, and it becomes a local news shelf.
+// Add as many regions as you like.
+function regionPickerHTML() {
+  return `<label class="field"><span>City, county or ZIP</span><input id="rgQ" autocomplete="off" placeholder="Fort Myers, FL or 05401"></label>
+    <p class="ferr" id="rgErr" role="alert"></p><ul class="list srcs" id="rgRes" hidden></ul><div class="chips" id="rgAdded"></div>`;
+}
+function regionPicker(onAdded) {
+  let timer, seq = 0;
+  $("rgQ").addEventListener("input", () => {
+    clearTimeout(timer);
+    const q = $("rgQ").value.trim(), n = ++seq;
+    if (q.length < 3) { $("rgRes").hidden = true; return; }
+    timer = setTimeout(async () => {
+      try {
+        const { results } = await api(`regions/search?q=${encodeURIComponent(q)}`);
+        if (n !== seq) return;
+        $("rgRes").hidden = false;
+        $("rgRes").innerHTML = results.map((r, i) => `<li><span class="txt"><b>${esc(r.label)}</b><span class="sub">News from about 25 miles around</span></span><button class="small" data-rg="${i}">Add</button></li>`).join("")
+          || `<li><span class="txt"><span class="sub">No US place by that name. Try a nearby city or a ZIP code.</span></span></li>`;
+        $("rgRes").onclick = async e => {
+          const b = e.target.closest("[data-rg]"); if (!b) return;
+          const r = results[+b.dataset.rg]; b.disabled = true;
+          try {
+            await api("regions/add", r);
+            await refreshMe();
+            $("rgRes").hidden = true; $("rgQ").value = "";
+            $("rgAdded").insertAdjacentHTML("beforeend", `<span class="chip">${esc(r.label)}</span>`);
+            toast(`${r.label.split(",")[0]} added. Local stories arrive within about 15 minutes.`);
+            onAdded?.();
+          } catch (x) { $("rgErr").textContent = x.message; b.disabled = false; }
+        };
+      } catch (x) { $("rgErr").textContent = x.message; }
+    }, 300);
   });
 }
 
