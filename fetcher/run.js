@@ -13,6 +13,7 @@ import { alerts } from "./alerts.js";
 import { vetPending, refreshSuggestions } from "./vet.js";
 import { retention } from "./retention.js";
 import { signups } from "./signups.js";
+import { skipped } from "./skip.js";
 
 const STRATEGIES = { rss, gnews, gsearch, sitemap, scrape };
 const RUN_START = Date.now();
@@ -66,7 +67,7 @@ async function processSourceInner(source) {
     return { source: source.name, error: e.message };
   }
 
-  const fresh = found.items.filter(i => i.url && (!i.published || Date.now() - Date.parse(i.published) < MAX_AGE[source.kind]));
+  const fresh = found.items.filter(i => i.url && !skipped(source, i.url) && (!i.published || Date.now() - Date.parse(i.published) < MAX_AGE[source.kind]));
   const have = await db.known(fresh.map(i => i.url));
   const todo = fresh.filter(i => !have.has(i.url)).slice(0, MAX_NEW_PER_SOURCE);
 
