@@ -1,6 +1,6 @@
 // Daily shelf quality check. For each followed interest, take the top 20 stories the real ranking
 // would show and have Claude Haiku rate how well each fits (2 on topic, 1 related, 0 off topic).
-// Results go to tangent_quality for the admin dashboard. A thin phrase shelf gets a longer window.
+// Results go to tangent_quality for the admin dashboard, and each shelf's relevance bar self-tunes.
 // Cost: about 20 interests a day at ~1,500 input and ~150 output tokens, roughly $0.15 a month on
 // Haiku 5.5; a monthly token cap in tangent_config ("judge_cap", default 3M) stops it regardless.
 import Anthropic from "@anthropic-ai/sdk";
@@ -59,7 +59,11 @@ export async function quality() {
     if (!r) continue;
     spent += r.tokens; checked++;
     await db.saveQuality({ interest_id: t.interest_id, available: items.length, ...summarize(sample, r.scores), tokens: r.tokens });
-    if (t.kind === "phrase" && items.length < 30) await db.widenInterest(t.interest_id);
+    // Self-tuning: a shelf with plenty of stories but too many off-topic ones raises its relevance bar a
+    // notch; a thin one lowers it (and a thin phrase also looks further back). Bounded both ways.
+    const q = summarize(sample, r.scores).precision;
+    if (items.length >= 60 && q < 0.75) await db.tuneInterest(t.interest_id, 0.02);
+    else if (items.length < 30) { await db.tuneInterest(t.interest_id, -0.02); if (t.kind === "phrase") await db.widenInterest(t.interest_id); }
   }
   await db.setConfig("judge_used", `${month}:${used + spent}`);
   await db.setConfig("quality_at", new Date().toISOString());

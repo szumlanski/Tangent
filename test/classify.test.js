@@ -8,6 +8,9 @@ test("junk flags", () => {
   assert.deepEqual(flagsFor({ title: "AP Sports SummaryBrief at 10:02 a.m. EDT", url: "https://x.com/a" }), ["digest"]);
   assert.deepEqual(flagsFor({ title: "How to plan an RV getaway", url: "https://x.com/sponsored/how-to" }), ["sponsored"]);
   assert.deepEqual(flagsFor({ title: "Town Of Essex, Notice Of Public Hearing", url: "https://x.com/a" }), ["listing"]);
+  assert.deepEqual(flagsFor({ title: "News-Press Events - IMCP Fall Break Camp", url: "https://x.com/a" }), ["listing"]);
+  assert.deepEqual(flagsFor({ title: "Times Argus Events for 20261022", url: "https://x.com/a" }), ["listing"]);
+  assert.deepEqual(flagsFor({ title: "Major events reshape the Middle East", url: "https://x.com/a" }), []);
   assert.deepEqual(flagsFor({ title: "Cape Coral council votes on traffic lights", url: "https://x.com/news/local/a" }), []);
 });
 

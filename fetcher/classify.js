@@ -18,7 +18,7 @@ export async function topicsFor(vec) {
 
 const PRESS = /\b(business wire|businesswire|pr ?newswire|globe ?newswire|accesswire|ein presswire|newsfile)\b/i;
 const DIGEST = /\b(summarybrief|news in brief|morning news brief|business briefs|daily digest|headlines? (for|at) \d)/i;
-const LISTING = /\b(notice of public hearing|legal notice|request for proposals|rfp'?s?\b|lien auction|invitation to bid|child find notice)/i;
+const LISTING = /\b(notice of public hearing|legal notice|request for proposals|rfp'?s?\b|lien auction|invitation to bid|child find notice)|^[\w .'-]{0,30}\bevents?\s*(-|:|for\s+\d)/i;
 export function flagsFor(row) {
   const text = `${row.title || ""} ${row.excerpt || ""} ${row.opening || ""}`;
   const path = (() => { try { return new URL(row.url).pathname; } catch { return ""; } })();

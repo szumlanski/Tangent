@@ -165,4 +165,4 @@ export const qualityTargets = () => rest("rpc/tangent_quality_targets", { method
 export const rankShelf = (user, shelf, limit) => rest("rpc/tangent_shelf_rank", { method: "POST", body: { p_secret: "", p_user: user, p_shelf: shelf, p_offset: 0, p_limit: limit } });
 export const saveQuality = row => rest("rpc/tangent_quality_save", { method: "POST", body: { p_row: row } });
 export const widenInterest = id => rest("rpc/tangent_interest_widen", { method: "POST", body: { p_id: id } });
-
+export const tuneInterest = (id, delta) => rest("rpc/tangent_interest_tune", { method: "POST", body: { p_id: id, p_delta: delta } });
