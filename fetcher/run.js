@@ -16,6 +16,7 @@ import { signups } from "./signups.js";
 import { skipped } from "./skip.js";
 import { localTopic, isLocal, opening } from "./local.js";
 import { enrich } from "./enrich.js";
+import { refreshInterests } from "./interests.js";
 
 const STRATEGIES = { rss, gnews, gsearch, sitemap, scrape };
 const RUN_START = Date.now();
@@ -186,6 +187,7 @@ await stories().catch(e => console.warn("stories:", e.message));
 
 // Meaning vectors, topics, junk flags and quality for new (and backlog) articles; free and local.
 const enriched = await enrich().catch(e => (console.warn("enrich:", e.message), 0));
+await refreshInterests().catch(e => console.warn("interests:", e.message));
 
 // Push alerts for what just arrived (local matching, no AI).
 await alerts().catch(e => console.warn("alerts:", e.message));

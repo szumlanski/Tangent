@@ -1,0 +1,86 @@
+-- Engine phase 2: rank a shelf's stories from the whole pool.
+--   recall:   nearest by meaning to the interest (HNSW) ∪ keyword hits on the phrase ∪ the shelf's own sources
+--   relevant: similarity (plus a bonus for a keyword hit or a chosen source) above the interest's bar
+--   score:    relevance × quality × freshness (news halves in a day, video and blogs slower) × story size
+--   then one card per story cluster, and a gentle per-source penalty so no outlet floods the shelf.
+-- Follow-mode shelves (regional) and interests without a vector yet fall back to tangent_shelf_feed.
+-- Returns a JSON array of feed rows, each with "why" and "score".
+create or replace function public.tangent_shelf_rank(p_secret text, p_user uuid, p_shelf bigint, p_offset int, p_limit int)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare
+  sh public.tangent_shelves;
+  it public.tangent_interests;
+  tsq tsquery;
+  since timestamptz;
+  out jsonb;
+begin
+  perform public.tangent_require(p_secret);
+  select * into sh from public.tangent_shelves where id = p_shelf and user_id = p_user and removed_at is null;
+  if not found then raise exception 'not_found'; end if;
+  select * into it from public.tangent_interests where id = sh.interest_id;
+  if sh.mode = 'follow' or it.id is null or (it.vec is null and it.terms is null) then
+    select coalesce(jsonb_agg(to_jsonb(f)), '[]') into out
+    from public.tangent_shelf_feed(p_secret, p_user, p_shelf, null, least(coalesce(p_limit, 40) + coalesce(p_offset, 0), 100)) f;
+    return out;
+  end if;
+  if it.terms is not null then tsq := plainto_tsquery('english', it.terms); end if;
+  since := now() - make_interval(days => it.window_days);
+  perform set_config('hnsw.ef_search', '400', true);
+  perform set_config('hnsw.iterative_scan', 'relaxed_order', true);
+
+  with ann as (
+    select a.id from public.tangent_articles a
+    where it.vec is not null and a.emb is not null and a.published_at > since and not a.paywalled and not a.offtopic
+    order by a.emb operator(extensions.<=>) it.vec limit 600
+  ), kw as (
+    select a.id from public.tangent_articles a
+    where tsq is not null and a.fts @@ tsq and a.published_at > since and not a.paywalled and not a.offtopic
+    order by a.published_at desc limit 400
+  ), pin as (
+    select a.id from public.tangent_articles a
+    join public.tangent_shelf_sources ss on ss.source_id = a.source_id and ss.shelf_id = sh.id and ss.removed_at is null
+    where a.published_at > since and not a.paywalled and not a.offtopic
+    order by a.published_at desc limit 400
+  ), cand as (select id from ann union select id from kw union select id from pin),
+  scored as (
+    select f.*, a.quality, a.flags,
+      coalesce(1 - (a.emb operator(extensions.<=>) it.vec), 0)::real as sim,
+      (tsq is not null and a.fts @@ tsq) as kwhit,
+      exists (select 1 from pin where pin.id = a.id) as pinned
+    from cand
+    join public.tangent_articles a on a.id = cand.id
+    join public.tangent_feed f on f.id = cand.id
+  ), rel as (
+    select s.*, (s.sim + case when s.kwhit then 0.15 else 0 end + case when s.pinned then 0.05 else 0 end) as relevance
+    from scored s
+  ), ok as (
+    select r.*,
+      sqrt(greatest(r.relevance - it.min_sim + 0.05, 0))
+      * coalesce(r.quality, 1)
+      * exp(-ln(2) * extract(epoch from now() - r.published_at) / 3600 / case when r.kind in ('youtube', 'blog', 'podcast') then 72 else 24 end)
+      * (1 + 0.2 * ln(greatest(coalesce(r.story_size, 1), 1))) as score0
+    from rel r
+    where r.relevance >= it.min_sim
+      -- a phrase shelf without a vector yet relies on keyword hits only
+      and (it.vec is not null or r.kwhit)
+  ), one as (
+    select o.*, row_number() over (partition by coalesce(o.cluster_id, -o.id) order by o.score0 desc) as crn from ok o
+  ), div as (
+    select o.*, o.score0 * power(0.85, row_number() over (partition by o.source_id order by o.score0 desc) - 1) as score
+    from one o where o.crn = 1
+  ), page as (
+    select d.* from div d order by d.score desc offset greatest(coalesce(p_offset, 0), 0) limit least(greatest(coalesce(p_limit, 40), 1), 100)
+  )
+  select coalesce(jsonb_agg(
+    (to_jsonb(p) - array['quality', 'flags', 'sim', 'kwhit', 'pinned', 'relevance', 'score0', 'crn'])
+    || jsonb_build_object('score', round(p.score::numeric, 4), 'why',
+      concat_ws(' · ',
+        case when p.kwhit then 'Mentions ' || it.label else 'About ' || it.label end,
+        case when coalesce(p.story_size, 1) > 2 then p.story_size || ' outlets' end,
+        case when p.pinned then 'a source on this shelf' end))
+    order by p.score desc), '[]') into out
+  from page p;
+  return out;
+end $$;
+revoke execute on function public.tangent_shelf_rank(text, uuid, bigint, int, int) from public;
+grant execute on function public.tangent_shelf_rank(text, uuid, bigint, int, int) to anon;

@@ -5,12 +5,12 @@ import { embed, toPg } from "./embed.js";
 import { topicsFor, flagsFor, qualityFor } from "./classify.js";
 import { opening } from "./local.js";
 
-const PER_ROUND = 3000, PAGE = 300;
+const PER_ROUND = 8000, PAGE = 400;
 export async function enrich() {
   if (process.env.DRY === "1") return 0;
   const started = Date.now();
   let done = 0;
-  while (done < PER_ROUND && Date.now() - started < 4 * 60e3) {
+  while (done < PER_ROUND && Date.now() - started < 5 * 60e3) {
     const rows = await db.unenriched(PAGE);
     if (!rows.length) break;
     for (const r of rows) r.opening = opening(r.body_html).slice(0, 800);

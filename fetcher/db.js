@@ -151,3 +151,10 @@ export const trimOlder = (table, col, before) => count(`${table}?${col}=lt.${bef
 export const unenriched = async limit => DRY ? [] : rest(`tangent_articles?enriched_at=is.null&select=id,url,kind,title,excerpt,image,body_html,word_count,extracted&order=fetched_at.desc&limit=${limit}`);
 export const setEnrichment = rows => rest("rpc/tangent_set_enrichment", { method: "POST", body: { p_rows: rows } });
 
+// ---- interests (shelf meaning vectors) ----
+export const interestsPending = async () => DRY ? [] : rest("rpc/tangent_interests_pending", { method: "POST", body: {} });
+export const setInterestVec = (id, vec) => rest("rpc/tangent_set_interest_vec", { method: "POST", body: { p_id: id, p_vec: vec } });
+// Vectors of recent stories that mention these words, newest first.
+export const recentVectors = async (terms, n) => (await rest(`tangent_articles?select=emb&emb=not.is.null&paywalled=is.false&fts=plfts(english).${encodeURIComponent(terms)}&order=published_at.desc&limit=${n}`))
+  .map(r => typeof r.emb === "string" ? JSON.parse(r.emb) : r.emb);
+
